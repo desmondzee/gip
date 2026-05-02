@@ -1,30 +1,87 @@
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+/* persona — editorial typography system */
+:root {
+  --bg: #f6f2ea;
+  --bg-tint: #ede7d8;
+  --rule: #d8cfba;
+  --rule-soft: #e6dfcd;
+
+  --ink: #221f1b;
+  --ink-2: #4a443d;
+  --ink-3: #6f6759;
+  --mute: #8b8472;
+  --mute-2: #aea693;
+
+  --accent: #c1583a;
+  --accent-soft: #de9277;
+
+  --match: #5d7d5e;
+  --differs: #a85842;
+  --live: #b67a2a;
+
+  --font-sans: var(--font-geist), -apple-system, system-ui, sans-serif;
+  --font-serif: var(--font-serif), "Tiempos", Georgia, serif;
 }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
-  background: #0b0b0d;
-  color: #e8e8ec;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 13px;
-  line-height: 1.5;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-a { color: inherit; }
+a, button {
+  font-family: inherit;
+  color: inherit;
+}
 
 button {
-  font-family: inherit;
-  font-size: inherit;
-  background: #1f1f24;
-  color: #e8e8ec;
-  border: 1px solid #2c2c33;
-  padding: 8px 16px;
-  border-radius: 4px;
+  background: none;
+  border: none;
+  padding: 0;
   cursor: pointer;
+  font-size: inherit;
+  text-align: inherit;
+  color: inherit;
 }
 
-button:hover { background: #2a2a30; }
-button:disabled { opacity: 0.5; cursor: not-allowed; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+*:focus { outline: none; }
+*:focus-visible {
+  outline: 1.5px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 1px;
+}
+
+.serif {
+  font-family: var(--font-serif);
+  letter-spacing: -0.005em;
+  font-feature-settings: "liga", "kern";
+}
+.italic { font-style: italic; }
+
+.tnum { font-variant-numeric: tabular-nums; }
+.lnum { font-variant-numeric: lining-nums tabular-nums; }
+.onum { font-variant-numeric: oldstyle-nums; }
+
+@keyframes rail-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.live-rail { animation: rail-pulse 1.6s ease-in-out infinite; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fade-up 240ms ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .live-rail, .fade-up { animation: none; }
+}
