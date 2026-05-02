@@ -9,7 +9,7 @@ import { safeTruncate } from "../util/sanitize"
 
 const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6"
 const DEFAULT_USER_NAME = process.env.PERSONA_USER_NAME ?? "the user"
-const MAX_TURNS = 8
+const MAX_TURNS = 12
 const HARD_TIMEOUT_MS = 90_000
 
 let _client: Anthropic | null = null
@@ -194,6 +194,66 @@ export async function runAgent(
       messages.push({ role: "user", content: toolResults })
 
       if (didTerminate) break
+    }
+
+    // Forced synthesis: if we ran out of turns without calling
+    // summarize_for_answer, do one more call with tool_choice pinned to
+    // summarize_for_answer so we always return *something* rather than a
+    // blank card. Skip if we're already past the wall clock.
+    if (status === "exhausted" && Date.now() - start <= HARD_TIMEOUT_MS) {
+      messages.push({
+        role: "user",
+        content:
+          "You've used all your exploration turns. Call summarize_for_answer now with your best answer from the evidence gathered so far. Cite the result_ids you actually have. Do not call any other tool.",
+      })
+      const summarizeOnly = TOOL_DEFS.filter((t) => t.name === "summarize_for_answer")
+      const response = await client().messages.create({
+        model: MODEL,
+        max_tokens: 1024,
+        system: sysPrompt,
+        tools: summarizeOnly as unknown as Anthropic.Messages.Tool[],
+        tool_choice: { type: "tool", name: "summarize_for_answer" },
+        messages,
+      })
+      const toolUse = response.content.find((b) => b.type === "tool_use")
+      if (toolUse?.type === "tool_use" && toolUse.name === "summarize_for_answer") {
+        const args = toolUse.input as Record<string, unknown>
+        const tCallStart = Date.now()
+        emit({
+          type: "tool_call",
+          tool_use_id: toolUse.id,
+          tool: "summarize_for_answer",
+          args,
+          t: tCallStart - start,
+        })
+        const result = await dispatchTool("summarize_for_answer", args)
+        emit({
+          type: "tool_result",
+          tool_use_id: toolUse.id,
+          tool: "summarize_for_answer",
+          result_summary: result.summary,
+          latency_ms: Date.now() - tCallStart,
+          t: Date.now() - start,
+          hit_ids: result.hit_ids,
+        })
+        const raw = result.raw as { answer: string; citation_ids: string[]; citations: SearchHit[] }
+        finalCitations = raw.citations
+        finalAnswer = await voicePhase({
+          userName,
+          question,
+          draftAnswer: raw.answer,
+          citations: raw.citations,
+          emit,
+          startMs: start,
+        })
+        status = "done"
+        emit({
+          type: "answer",
+          text: finalAnswer,
+          citation_ids: raw.citation_ids,
+          t: Date.now() - start,
+        })
+      }
     }
   } catch (e) {
     status = "error"
