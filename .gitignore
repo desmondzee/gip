@@ -5,6 +5,9 @@ out/
 .env.local
 .env*.local
 bun.lockb
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 .DS_Store
 *.log
 .vercel
