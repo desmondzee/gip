@@ -117,7 +117,21 @@ export function rememberHits(hits: SearchHit[]): void {
 }
 
 export function recallHits(ids: string[]): SearchHit[] {
-  return ids.map((id) => memoryCache.get(id)).filter((h): h is SearchHit => Boolean(h))
+  const out: SearchHit[] = []
+  for (const id of ids) {
+    const direct = memoryCache.get(id)
+    if (direct) {
+      out.push(direct)
+      continue
+    }
+    for (const [k, v] of memoryCache) {
+      if (k.endsWith(id) || id.endsWith(k)) {
+        out.push(v)
+        break
+      }
+    }
+  }
+  return out
 }
 
 export function clearMemoryCache(): void {
@@ -147,7 +161,7 @@ export async function dispatchTool(
           ? `0 hits for "${query}" in ${collection}`
           : `${hits.length} hits in ${collection} (${mode}). Top: ${hits
               .slice(0, 3)
-              .map((h) => `[${h._id.slice(-6)}] ${truncate(h.text, 80)} (score=${h.score.toFixed(3)})`)
+              .map((h) => `[id=${h._id}] ${truncate(h.text, 80)} (score=${h.score.toFixed(3)})`)
               .join(" · ")}`
       return { summary, raw: hits, hits }
     }
@@ -156,10 +170,13 @@ export async function dispatchTool(
       const criterion = args.criterion as string
       const items = recallHits(ids)
       const reordered = rerankHits(items, criterion)
-      const summary = `Reranked ${reordered.length} items by ${criterion}. New order: ${reordered
-        .slice(0, 5)
-        .map((h) => `[${h._id.slice(-6)}]`)
-        .join(", ")}`
+      const summary =
+        reordered.length === 0
+          ? `Reranked 0 items by ${criterion} — none of the supplied result_ids were in cache. Run search again first.`
+          : `Reranked ${reordered.length} items by ${criterion}. New order: ${reordered
+              .slice(0, 5)
+              .map((h) => `[id=${h._id}]`)
+              .join(", ")}`
       return { summary, raw: reordered.map((h) => h._id), hits: reordered }
     }
     case "rechunk": {
@@ -168,7 +185,7 @@ export async function dispatchTool(
       const hit = memoryCache.get(docId)
       if (!hit) return { summary: `doc_id ${docId} not in cache`, raw: null }
       const chunks = chunkText(hit.text, mode)
-      const summary = `Split [${docId.slice(-6)}] into ${chunks.length} ${mode} chunks. First: "${truncate(chunks[0] ?? "", 80)}"`
+      const summary = `Split [id=${docId}] into ${chunks.length} ${mode} chunks. First: "${truncate(chunks[0] ?? "", 80)}"`
       return { summary, raw: chunks }
     }
     case "cross_reference": {
@@ -181,7 +198,7 @@ export async function dispatchTool(
           ? `No cross-reference matches on ${on}`
           : `${matched.length} cross-ref matches on ${on}: ${matched
               .slice(0, 3)
-              .map((h) => `[${h._id.slice(-6)}]`)
+              .map((h) => `[id=${h._id}]`)
               .join(", ")}`
       return { summary, raw: matched.map((h) => h._id), hits: matched }
     }
