@@ -60,36 +60,70 @@ export async function ingest(source: SourceName, items: RawItem[]): Promise<{ in
 export async function ingestGmailViaComposio(): Promise<RawItem[]> {
   const { client, userId } = getComposio()
 
-  // Fetch emails from the last 90 days — adjust the window with the `query` param
   const cutoffSec = Math.floor((Date.now() - 90 * 24 * 60 * 60 * 1000) / 1000)
+  const PAGE_SIZE = 25
+  const TARGET = 100
+  const allMessages: any[] = []
+  let pageToken: string | undefined = undefined
 
-  const result: any = await client.tools.execute("GMAIL_FETCH_EMAILS", {
-    userId,
-    arguments: {
+  while (allMessages.length < TARGET) {
+    const args: Record<string, unknown> = {
       query: `after:${cutoffSec}`,
-      max_results: 200,
+      max_results: PAGE_SIZE,
       include_spam_trash: false,
-    },
-    dangerouslySkipVersionCheck: true,
+    }
+    if (pageToken) args.page_token = pageToken
+
+    const result: any = await client.tools.execute("GMAIL_FETCH_EMAILS", {
+      userId,
+      arguments: args,
+      dangerouslySkipVersionCheck: true,
+    })
+    const batch: any[] = result?.data?.messages ?? result?.messages ?? []
+    allMessages.push(...batch)
+    pageToken = result?.data?.nextPageToken ?? result?.data?.next_page_token
+    console.log(`  [gmail] fetched ${allMessages.length} (page+${batch.length}, nextToken=${pageToken ? "yes" : "no"})`)
+    if (!pageToken || batch.length === 0) break
+  }
+
+  const messages: any[] = allMessages
+
+  function header(msg: any, name: string): string | null {
+    const headers = msg?.payload?.headers ?? []
+    const h = headers.find((x: any) => String(x?.name).toLowerCase() === name.toLowerCase())
+    return h?.value ?? null
+  }
+
+  return messages.map((msg: any) => {
+    const id = msg.id ?? msg.messageId
+    const tsRaw = msg.messageTimestamp ?? msg.internalDate ?? msg.date
+    const ts = tsRaw
+      ? typeof tsRaw === "number"
+        ? new Date(tsRaw)
+        : !isNaN(Number(tsRaw))
+          ? new Date(Number(tsRaw))
+          : new Date(tsRaw)
+      : new Date()
+    const subject = msg.subject ?? header(msg, "Subject") ?? ""
+    const from = msg.from ?? header(msg, "From")
+    const to = msg.to ?? header(msg, "To")
+    const body = msg.messageText ?? msg.body ?? msg.snippet ?? ""
+    const labels = msg.labelIds ?? msg.labels ?? []
+
+    return {
+      external_id: `gmail_${id}`,
+      ts,
+      text: [subject, body].filter(Boolean).join("\n\n").slice(0, 8000),
+      metadata: {
+        from,
+        to,
+        subject,
+        labels,
+        snippet: msg.snippet ?? null,
+        thread_id: msg.threadId ?? null,
+      },
+    }
   })
-
-  const messages: any[] = result?.data?.messages ?? result?.messages ?? []
-
-  return messages.map((msg: any) => ({
-    external_id: `gmail_${msg.id ?? msg.messageId}`,
-    ts: msg.internalDate
-      ? new Date(Number(msg.internalDate))
-      : new Date(msg.date ?? Date.now()),
-    text: [msg.subject, msg.body ?? msg.snippet ?? ""].filter(Boolean).join("\n\n"),
-    metadata: {
-      from: msg.from ?? null,
-      to: msg.to ?? null,
-      subject: msg.subject ?? null,
-      labels: msg.labelIds ?? msg.labels ?? [],
-      snippet: msg.snippet ?? null,
-      thread_id: msg.threadId ?? null,
-    },
-  }))
 }
 
 export async function ingestCalendarViaComposio(): Promise<RawItem[]> {
