@@ -812,6 +812,7 @@ function ColdStart({ onStart }: { onStart: () => void }) {
           font-weight: 400;
           line-height: 1.12;
           letter-spacing: -0.018em;
+          text-wrap: balance;
         }
         h1 em { font-style: italic; color: var(--accent); }
         p {
@@ -920,7 +921,7 @@ function Document({
           font-weight: 400;
           letter-spacing: -0.02em;
           color: var(--ink);
-          max-width: 18ch;
+          text-wrap: balance;
         }
         .verdict {
           display: flex;
