@@ -12,9 +12,71 @@ type CardState = {
   expanded: boolean
 }
 
+const SOURCES = ["gmail_msgs", "calendar_events", "slack_msgs"] as const
+type IngestSource = (typeof SOURCES)[number]
+type IngestStatus = "idle" | "running" | "done" | "error"
+type ConnectStatus = "unknown" | "checking" | "connected" | "not_connected" | "error"
+
 export default function Page() {
   const [cards, setCards] = useState<CardState[]>([])
   const [running, setRunning] = useState(false)
+  const [ingestStatus, setIngestStatus] = useState<Record<IngestSource, IngestStatus>>(
+    () => Object.fromEntries(SOURCES.map((s) => [s, "idle"])) as Record<IngestSource, IngestStatus>
+  )
+  const [ingestMsg, setIngestMsg] = useState<Record<IngestSource, string>>(
+    () => Object.fromEntries(SOURCES.map((s) => [s, ""])) as Record<IngestSource, string>
+  )
+  const [connectStatus, setConnectStatus] = useState<Record<IngestSource, ConnectStatus>>(
+    () => Object.fromEntries(SOURCES.map((s) => [s, "unknown"])) as Record<IngestSource, ConnectStatus>
+  )
+  const [connectUrls, setConnectUrls] = useState<Record<IngestSource, string>>(
+    () => Object.fromEntries(SOURCES.map((s) => [s, ""])) as Record<IngestSource, string>
+  )
+
+  const checkConnection = useCallback(async (source: IngestSource) => {
+    setConnectStatus((p) => ({ ...p, [source]: "checking" }))
+    try {
+      const res = await fetch(`/api/connect?source=${source}`)
+      const data = await res.json()
+      if (!res.ok) {
+        setConnectStatus((p) => ({ ...p, [source]: "error" }))
+        return
+      }
+      if (data.status === "connected") {
+        setConnectStatus((p) => ({ ...p, [source]: "connected" }))
+      } else {
+        setConnectStatus((p) => ({ ...p, [source]: "not_connected" }))
+        setConnectUrls((p) => ({ ...p, [source]: data.redirectUrl ?? "" }))
+      }
+    } catch {
+      setConnectStatus((p) => ({ ...p, [source]: "error" }))
+    }
+  }, [])
+
+  useEffect(() => {
+    SOURCES.forEach((s) => checkConnection(s))
+  }, [checkConnection])
+
+  const runIngest = useCallback(async (source: IngestSource) => {
+    setIngestStatus((p) => ({ ...p, [source]: "running" }))
+    setIngestMsg((p) => ({ ...p, [source]: "" }))
+    try {
+      const res = await fetch("/api/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? res.statusText)
+      setIngestMsg((p) => ({ ...p, [source]: `+${data.inserted} new, ~${data.updated} updated` }))
+      setIngestStatus((p) => ({ ...p, [source]: "done" }))
+      // refresh connection status after a successful ingest
+      checkConnection(source)
+    } catch (err) {
+      setIngestMsg((p) => ({ ...p, [source]: err instanceof Error ? err.message : String(err) }))
+      setIngestStatus((p) => ({ ...p, [source]: "error" }))
+    }
+  }, [checkConnection])
 
   useEffect(() => {
     fetch("/api/persona/questions")
@@ -106,6 +168,67 @@ export default function Page() {
           {running ? "running…" : "run all"}
         </button>
       </header>
+
+      <div
+        style={{
+          display: "flex",
+          gap: "8px",
+          flexWrap: "wrap",
+          marginBottom: "24px",
+          padding: "12px",
+          background: "#0f0f14",
+          border: "1px solid #2c2c33",
+          borderRadius: "6px",
+          alignItems: "center",
+        }}
+      >
+        <span style={{ color: "#666", fontSize: "11px", marginRight: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>ingest</span>
+        {SOURCES.map((src) => {
+          const cs = connectStatus[src]
+          const isConnected = cs === "connected"
+          const notConnected = cs === "not_connected"
+          const connectUrl = connectUrls[src]
+          return (
+            <div key={src} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              {/* connection dot */}
+              <span
+                title={cs}
+                style={{
+                  width: "7px",
+                  height: "7px",
+                  borderRadius: "50%",
+                  display: "inline-block",
+                  background: cs === "connected" ? "#4ade80" : cs === "not_connected" ? "#f87171" : cs === "checking" ? "#fbbf24" : "#555",
+                  flexShrink: 0,
+                }}
+              />
+              {notConnected && connectUrl ? (
+                <a
+                  href={connectUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ fontSize: "11px", padding: "4px 10px", border: "1px solid #f87171", borderRadius: "4px", color: "#f87171", textDecoration: "none" }}
+                >
+                  {src} connect ↗
+                </a>
+              ) : (
+                <button
+                  onClick={() => runIngest(src)}
+                  disabled={ingestStatus[src] === "running" || !isConnected}
+                  style={{ fontSize: "11px", padding: "4px 10px" }}
+                >
+                  {ingestStatus[src] === "running" ? `${src}…` : src}
+                </button>
+              )}
+              {ingestMsg[src] && (
+                <span style={{ fontSize: "11px", color: ingestStatus[src] === "error" ? "#f87171" : "#4ade80" }}>
+                  {ingestMsg[src]}
+                </span>
+              )}
+            </div>
+          )
+        })}
+      </div>
 
       <div
         style={{
