@@ -70,6 +70,7 @@ export async function ingestGmailViaComposio(): Promise<RawItem[]> {
       max_results: 200,
       include_spam_trash: false,
     },
+    dangerouslySkipVersionCheck: true,
   })
 
   const messages: any[] = result?.data?.messages ?? result?.messages ?? []
@@ -108,6 +109,7 @@ export async function ingestCalendarViaComposio(): Promise<RawItem[]> {
       single_events: true,
       order_by: "startTime",
     },
+    dangerouslySkipVersionCheck: true,
   })
 
   const events: any[] = result?.data?.items ?? result?.items ?? []
@@ -139,6 +141,7 @@ export async function ingestSlackViaComposio(): Promise<RawItem[]> {
       exclude_archived: true,
       limit: 200,
     },
+    dangerouslySkipVersionCheck: true,
   })
 
   const channels: any[] = channelRes?.data?.channels ?? channelRes?.channels ?? []
@@ -156,6 +159,7 @@ export async function ingestSlackViaComposio(): Promise<RawItem[]> {
           oldest: oldestSec,
           limit: 200,
         },
+        dangerouslySkipVersionCheck: true,
       })
 
       const messages: any[] = histRes?.data?.messages ?? histRes?.messages ?? []
