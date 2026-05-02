@@ -8,7 +8,6 @@ export const dynamic = "force-dynamic"
 const TOOLKIT_MAP: Record<string, string> = {
   gmail_msgs: "gmail",
   calendar_events: "googlecalendar",
-  slack_msgs: "slack",
   notion_docs: "notion",
   github_activity: "github",
   gdrive_files: "googledrive",

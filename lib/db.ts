@@ -7,7 +7,6 @@ let _db: Db | null = null
 export const SOURCES = [
   "gmail_msgs",
   "calendar_events",
-  "slack_msgs",
   "notion_docs",
   "github_activity",
   "gdrive_files",

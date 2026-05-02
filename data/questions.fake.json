@@ -63,7 +63,7 @@
     "id": "q11",
     "category": "opinion",
     "question": "How do I feel about meetings?",
-    "ground_truth": "Frustrated. Particularly small standups that could be Slack messages."
+    "ground_truth": "Frustrated. Particularly small standups that could've just been a message."
   },
   {
     "id": "q12",
@@ -92,8 +92,8 @@
   {
     "id": "q16",
     "category": "voice",
-    "question": "Reply to a Slack DM saying 'we should add more daily standups'.",
-    "ground_truth": "Some version of: 'No — if I have one more 4-person standup that could've been a Slack message I'm going to lose it.'"
+    "question": "Reply to a DM saying 'we should add more daily standups'.",
+    "ground_truth": "Some version of: 'No — if I have one more 4-person standup that could've just been a message I'm going to lose it.'"
   },
   {
     "id": "q17",

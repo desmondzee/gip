@@ -5,7 +5,20 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import type { BenchmarkQuestion, TraceEvent } from "@/lib/schemas"
 
-type Status = "idle" | "running" | "done" | "error" | "timeout"
+type Status = "idle" | "running" | "done" | "error" | "timeout" | "exhausted"
+
+function failureCopy(status: Status, errorMessage?: string): { title: string; message: string } | null {
+  if (status === "error") {
+    return { title: "The agent couldn't complete this question.", message: errorMessage ?? "Unknown error" }
+  }
+  if (status === "timeout") {
+    return { title: "The agent timed out before answering.", message: errorMessage ?? "Try again — sometimes a retry lands faster." }
+  }
+  if (status === "exhausted") {
+    return { title: "The agent ran out of turns before answering.", message: errorMessage ?? "It searched but didn't converge on an answer. Try rephrasing or retrying." }
+  }
+  return null
+}
 
 type CardState = {
   question: BenchmarkQuestion
@@ -169,7 +182,12 @@ export default function Page() {
         buf = lines.pop() ?? ""
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue
-          const payload = JSON.parse(line.slice(6))
+          let payload: any
+          try {
+            payload = JSON.parse(line.slice(6))
+          } catch {
+            continue
+          }
           if (payload.type === "final") {
             setCards((prev) => {
               const next = [...prev]
@@ -854,15 +872,16 @@ function Document({
   const { question, events, answer, status, total_ms, error_message } = card
   const isCustom = !question.ground_truth
   const correct = status === "done" && !isCustom && isMatch(answer, question.ground_truth)
+  const failure = failureCopy(status, error_message)
 
   return (
     <article className="doc fade-up" key={card.question.id}>
       <h1 className="display">{question.question}</h1>
 
-      {status === "error" ? (
+      {failure ? (
         <section className="errsec">
-          <p className="errtitle">The agent couldn&apos;t complete this question.</p>
-          <p className="errmsg">{error_message ?? "Unknown error"}</p>
+          <p className="errtitle">{failure.title}</p>
+          <p className="errmsg">{failure.message}</p>
           <button className="retry" onClick={onRetry}>Try again <span aria-hidden>→</span></button>
         </section>
       ) : (
@@ -873,7 +892,7 @@ function Document({
         </>
       )}
 
-      {status !== "error" && (
+      {!failure && (
         <section className="verdict">
           {status === "done" ? (
             isCustom ? (
@@ -891,7 +910,7 @@ function Document({
         </section>
       )}
 
-      {status !== "error" && (
+      {!failure && (
         <section className="answer">
           <div className="agent serif">
             {answer ? (

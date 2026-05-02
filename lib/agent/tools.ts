@@ -2,12 +2,24 @@ import { SOURCES, type SourceName } from "../db"
 import { search } from "../atlas-search"
 import { llmRerank } from "../rerank"
 import type { SearchHit, ToolName } from "../schemas"
+import { sanitizeText } from "../util/sanitize"
+
+// Voice memory layer (eng review 4A): search_voice fans out across the
+// sources where conversational/document voice actually lives. Inbound-only
+// sources (youtube/discord/maps/photos) are excluded — they don't carry
+// authored cadence even when from_user happens to be tagged.
+const VOICE_SOURCES: readonly SourceName[] = [
+  "gmail_msgs",
+  "notion_docs",
+  "gdocs_pages",
+  "github_activity",
+] as const
 
 export const TOOL_DEFS = [
   {
     name: "search",
     description:
-      "Search one source collection. Use vector for semantic intent, text for exact phrases or names, hybrid when in doubt. Call this first. Call again with refined queries if first results are weak. Different sources reveal different aspects (Gmail = explicit statements, Slack = casual reactions, Calendar = time/place context, Notion = structured notes, GitHub = work patterns/code activity, Drive/Docs/Sheets = saved files and longer-form writing, LinkedIn = professional identity, YouTube = subscriptions and playlists revealing taste, Discord = communities the user belongs to, Maps = location/recency, Photos = scenes/people).",
+      "Search one source collection. Use vector for semantic intent, text for exact phrases or names, hybrid when in doubt. Call this first. Call again with refined queries if first results are weak. Different sources reveal different aspects (Gmail = explicit statements, Calendar = time/place context, Notion = structured notes, GitHub = work patterns/code activity, Drive/Docs/Sheets = saved files and longer-form writing, LinkedIn = professional identity, YouTube = subscriptions and playlists revealing taste, Discord = communities the user belongs to, Maps = location/recency, Photos = scenes/people).",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -19,7 +31,7 @@ export const TOOL_DEFS = [
         query: {
           type: "string",
           description:
-            "The search query. Rewrite the user question into the language likely to be in this source (e.g. for Slack, casual fragments; for Gmail, formal phrases or sender names).",
+            "The search query. Rewrite the user question into the language likely to be in this source (e.g. for Gmail, formal phrases or sender names; for Notion/Docs, structured topic phrases).",
         },
         k: {
           type: "number",
@@ -39,6 +51,29 @@ export const TOOL_DEFS = [
         },
       },
       required: ["collection", "query"],
+    },
+  },
+  {
+    name: "search_voice",
+    description:
+      "Retrieve exemplars of how the user actually writes — only items the user authored " +
+      "(sent Gmail, Notion/Google docs by the user, GitHub commits/issues by the user). " +
+      "Use this for VOICE / DRAFT questions ('respond as me to X', 'draft an email about Y'). " +
+      "Returns the top-K user-authored memories matching the query, ranked by recency. " +
+      "If this returns 0 hits, the user hasn't written about this topic before — surface the gap honestly, do NOT retry with broader queries.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: {
+          type: "string",
+          description: "Topic or phrase to find the user's prior writing on. Phrase as the user would think about it.",
+        },
+        k: {
+          type: "number",
+          description: "Number of voice exemplars to retrieve. Default 5. Sentence-level granularity; smaller is fine.",
+        },
+      },
+      required: ["query"],
     },
   },
   {
@@ -179,6 +214,41 @@ export async function dispatchTool(
               .join(" · ")}`
       return { summary, raw: hits, hits, hit_ids: hits.map((h) => h._id) }
     }
+    case "search_voice": {
+      const query = args.query as string
+      const k = (args.k as number | undefined) ?? 5
+      // Per-source fan-out, but each search uses the index-level
+      // metadata.from_user filter (eng review 4A) so the work happens at
+      // vectorSearch time, not as a slow $match post-stage.
+      const perSourceK = Math.max(2, Math.ceil(k / 2))
+      const fanOut = await Promise.all(
+        VOICE_SOURCES.map((s) =>
+          search({
+            source: s,
+            query,
+            k: perSourceK,
+            mode: "hybrid",
+            filter: { "metadata.from_user": true },
+          }).catch(() => [] as SearchHit[]),
+        ),
+      )
+      const flat = fanOut.flat()
+      // Sort by recency (most recent first) — voice exemplars matter more
+      // when they're recent, since cadence drifts.
+      const ranked = [...flat].sort(
+        (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime(),
+      )
+      const hits = ranked.slice(0, k)
+      rememberHits(hits)
+      const summary =
+        hits.length === 0
+          ? `0 voice exemplars for "${query}" — user hasn't written about this. Do NOT retry with a broader query; surface the gap honestly in the answer.`
+          : `${hits.length} voice exemplars for "${query}" (across ${new Set(hits.map((h) => h.source)).size} sources, ranked by recency). Top: ${hits
+              .slice(0, 3)
+              .map((h) => `[id=${h._id}] ${truncate(h.text, 80)} (${h.source})`)
+              .join(" · ")}`
+      return { summary, raw: hits, hits, hit_ids: hits.map((h) => h._id) }
+    }
     case "rerank": {
       const ids = args.result_ids as string[]
       const criterion = args.criterion as string
@@ -285,7 +355,7 @@ function sentimentScore(text: string): number {
   return neg - pos
 }
 
-function isUserAuthored(hit: SearchHit): boolean {
+export function isUserAuthored(hit: SearchHit): boolean {
   const md = hit.metadata as Record<string, unknown>
   if (md.from_user === true) return true
   if (md.author === "me") return true
@@ -357,7 +427,10 @@ function crossReferenceHits(a: SearchHit[], b: SearchHit[], on: string): SearchH
   return matches
 }
 
+// Sanitize after slicing: code-unit slicing can split a surrogate pair (emoji)
+// in half, and the orphan half breaks Anthropic's strict request validation
+// when this string is fed back as tool_result content on the next turn.
 function truncate(s: string, n: number): string {
-  if (s.length <= n) return s
-  return s.slice(0, n - 1) + "…"
+  if (s.length <= n) return sanitizeText(s)
+  return sanitizeText(s.slice(0, n - 1)) + "…"
 }

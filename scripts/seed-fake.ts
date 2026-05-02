@@ -22,32 +22,6 @@ const FAKE_DATA: Partial<Record<SourceName, RawItem[]>> = {
       metadata: { from: "me", to: ["mom@example.com"], subject: "Re: cookbook", thread_id: "t3", from_user: true },
     },
   ],
-  slack_msgs: [
-    {
-      external_id: "sl-001",
-      ts: new Date("2026-04-15T11:32:00Z"),
-      text: "ugh that bagel place on 3rd is so overrated, lukewarm coffee and the lox tasted like it sat out",
-      metadata: { channel: "#food", author: "me", from_user: true },
-    },
-    {
-      external_id: "sl-002",
-      ts: new Date("2026-03-28T16:01:00Z"),
-      text: "honestly the new claude tool use just works, switched off the langchain agent entirely and latency dropped 40%",
-      metadata: { channel: "#eng", author: "me", from_user: true },
-    },
-    {
-      external_id: "sl-003",
-      ts: new Date("2026-04-22T22:14:00Z"),
-      text: "watched dune part 2 again, denis villeneuve is now my favorite working director, it's not even close",
-      metadata: { channel: "#random", author: "me", from_user: true },
-    },
-    {
-      external_id: "sl-004",
-      ts: new Date("2026-04-25T08:30:00Z"),
-      text: "if i have one more 4-person standup that could've been a slack message i'm going to lose it",
-      metadata: { channel: "#vent", author: "me", from_user: true },
-    },
-  ],
   calendar_events: [
     {
       external_id: "cal-001",

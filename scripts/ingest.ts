@@ -26,21 +26,127 @@ export interface RawItem {
   metadata: Record<string, unknown>
 }
 
-export async function ingest(source: SourceName, items: RawItem[]): Promise<{ inserted: number; updated: number }> {
-  if (items.length === 0) return { inserted: 0, updated: 0 }
+// ---------------------------------------------------------------------------
+// User-authorship derivation (per eng review 1B)
+//
+// Voice memory (search_voice tool, LoRA training corpus) reads from
+// metadata.from_user === true. Each source has its own identity field; this
+// helper centralizes the logic. Set the matching env var per source you have
+// authored content in. Sources without a set env var stay untagged (which
+// means they never enter the voice corpus — safer than guessing).
+// ---------------------------------------------------------------------------
+
+function userEmails(): string[] {
+  const primary = (process.env.PERSONA_USER_EMAIL ?? "").trim().toLowerCase()
+  const aliases = (process.env.PERSONA_USER_EMAILS ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+  const all = primary ? [primary, ...aliases] : aliases
+  return [...new Set(all)]
+}
+
+function extractEmailAddress(s: unknown): string | null {
+  if (typeof s !== "string" || !s) return null
+  // Display-name form: "Jerry Jin <jerry@example.com>" → jerry@example.com
+  const angle = s.match(/<([^>]+)>/)
+  if (angle) return angle[1].trim().toLowerCase()
+  // Bare email
+  if (s.includes("@")) return s.trim().toLowerCase()
+  return null
+}
+
+function deriveFromUser(source: SourceName, metadata: Record<string, unknown>): boolean {
+  const emails = userEmails()
+  const notionId = (process.env.PERSONA_NOTION_USER_ID ?? "").trim()
+  const ghLogin = (process.env.PERSONA_GITHUB_LOGIN ?? "").trim()
+
+  switch (source) {
+    case "gmail_msgs": {
+      const from = extractEmailAddress(metadata.from)
+      return !!from && emails.includes(from)
+    }
+    case "notion_docs": {
+      // ingest stores `parent` and high-level fields; fall back to checking
+      // any user-id-shaped field on metadata. Future ingest passes can plumb
+      // page.created_by.id explicitly.
+      if (!notionId) return false
+      for (const key of ["created_by_id", "last_edited_by_id"]) {
+        if (metadata[key] === notionId) return true
+      }
+      return false
+    }
+    case "github_activity": {
+      // Owned profile/repo/star records are by definition the user's GitHub identity.
+      // For commit/issue records we'd have an `author` field — match by login.
+      if (!ghLogin) return false
+      const kind = metadata.kind
+      if (kind === "profile" || kind === "owned_repo") return true
+      const author = metadata.author ?? metadata.login
+      return typeof author === "string" && author === ghLogin
+    }
+    case "gdrive_files": {
+      const owners = metadata.owners
+      if (!Array.isArray(owners) || emails.length === 0) return false
+      return owners.some((o) => typeof o === "string" && emails.includes(o.toLowerCase()))
+    }
+    case "gdocs_pages":
+    case "gsheets_sheets": {
+      const owner = extractEmailAddress(metadata.owner) ?? extractEmailAddress(metadata.author)
+      return !!owner && emails.includes(owner)
+    }
+    case "calendar_events": {
+      const organizer = extractEmailAddress(metadata.organizer)
+      if (organizer && emails.includes(organizer)) return true
+      // Calendar API often surfaces `creator.self === true` for events the
+      // user created. ingest currently doesn't plumb `creator`; if it gets
+      // added, this will pick it up.
+      const creator = metadata.creator as { self?: boolean; email?: string } | undefined
+      if (creator?.self === true) return true
+      if (creator?.email && emails.includes(String(creator.email).toLowerCase())) return true
+      return false
+    }
+    case "linkedin_profile": {
+      // Profile records are by definition the user's own.
+      return true
+    }
+    case "instagram_posts": {
+      // Posts authored by the user (vs reels saved). ingest tags `kind` per item.
+      return metadata.kind === "post" || metadata.kind === "story"
+    }
+    case "photos_meta": {
+      // Photos taken/uploaded by the user vs received. Conservative: skip.
+      return false
+    }
+    // Inbound/passive sources — skip from voice corpus
+    case "youtube_activity":
+    case "discord_servers":
+    case "maps_history":
+      return false
+    default:
+      return false
+  }
+}
+
+export async function ingest(source: SourceName, items: RawItem[]): Promise<{ inserted: number; updated: number; tagged_user: number }> {
+  if (items.length === 0) return { inserted: 0, updated: 0, tagged_user: 0 }
   const col = await memoriesOf(source)
 
   const ops = []
+  let taggedUser = 0
   for (const item of items) {
     const cleanText = sanitizeText(item.text)
     const embedding = await embed(cleanText)
+    const fromUser = deriveFromUser(source, item.metadata)
+    if (fromUser) taggedUser++
+    const enrichedMetadata = { ...item.metadata, from_user: fromUser }
     const doc: Memory = {
       source,
       external_id: item.external_id,
       ts: item.ts,
       text: cleanText,
       embedding,
-      metadata: item.metadata,
+      metadata: enrichedMetadata,
       ingested_at: new Date(),
     }
     ops.push({
@@ -56,8 +162,11 @@ export async function ingest(source: SourceName, items: RawItem[]): Promise<{ in
   return {
     inserted: res.upsertedCount ?? 0,
     updated: res.modifiedCount ?? 0,
+    tagged_user: taggedUser,
   }
 }
+
+export { deriveFromUser }
 
 export async function ingestGmailViaComposio(): Promise<RawItem[]> {
   const { client, userId } = getComposio()
@@ -164,63 +273,6 @@ export async function ingestCalendarViaComposio(): Promise<RawItem[]> {
       html_link: evt.htmlLink ?? null,
     },
   }))
-}
-
-export async function ingestSlackViaComposio(): Promise<RawItem[]> {
-  const { client, userId } = getComposio()
-
-  // Step 1: list all joined channels
-  const channelRes: any = await client.tools.execute("SLACK_LIST_CONVERSATIONS", {
-    userId,
-    arguments: {
-      types: "public_channel,private_channel",
-      exclude_archived: true,
-      limit: 200,
-    },
-    dangerouslySkipVersionCheck: true,
-  })
-
-  const channels: any[] = channelRes?.data?.channels ?? channelRes?.channels ?? []
-
-  // Step 2: fetch recent message history per channel (last 90 days)
-  const oldestSec = String((Date.now() - 90 * 24 * 60 * 60 * 1000) / 1000)
-  const items: RawItem[] = []
-
-  for (const channel of channels) {
-    try {
-      const histRes: any = await client.tools.execute("SLACK_FETCH_CONVERSATION_HISTORY", {
-        userId,
-        arguments: {
-          channel: channel.id,
-          oldest: oldestSec,
-          limit: 200,
-        },
-        dangerouslySkipVersionCheck: true,
-      })
-
-      const messages: any[] = histRes?.data?.messages ?? histRes?.messages ?? []
-
-      for (const msg of messages) {
-        if (!msg.text) continue
-        items.push({
-          external_id: `slack_${channel.id}_${msg.ts}`,
-          ts: new Date(Number(msg.ts) * 1000),
-          text: msg.text,
-          metadata: {
-            channel_id: channel.id,
-            channel_name: channel.name ?? null,
-            user: msg.user ?? null,
-            thread_ts: msg.thread_ts ?? null,
-          },
-        })
-      }
-    } catch (err) {
-      // A channel may be inaccessible (e.g., archived mid-run, missing scopes)
-      console.warn(`[slack] skipped channel ${channel.name ?? channel.id}: ${err}`)
-    }
-  }
-
-  return items
 }
 
 export async function ingestNotionViaComposio(): Promise<RawItem[]> {
@@ -823,7 +875,6 @@ export async function ingestInstagramViaComposio(): Promise<RawItem[]> {
 const FETCHERS: Record<SourceName, () => Promise<RawItem[]>> = {
   gmail_msgs: ingestGmailViaComposio,
   calendar_events: ingestCalendarViaComposio,
-  slack_msgs: ingestSlackViaComposio,
   notion_docs: ingestNotionViaComposio,
   github_activity: ingestGithubViaComposio,
   gdrive_files: ingestGoogleDriveViaComposio,
@@ -870,7 +921,7 @@ async function main() {
     try {
       const items = await FETCHERS[source]()
       const res = await ingest(source, items)
-      console.log(`[${source}] ingested: ${res.inserted} new, ${res.updated} updated (from ${items.length} items)`)
+      console.log(`[${source}] ingested: ${res.inserted} new, ${res.updated} updated, ${res.tagged_user} tagged from_user (from ${items.length} items)`)
     } catch (err) {
       console.error(`[${source}] failed: ${err instanceof Error ? err.message : err}`)
     }

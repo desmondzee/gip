@@ -1,6 +1,6 @@
 import type { RunResult } from "../agent/loop"
 import type { TraceEvent } from "../schemas"
-import { sanitizeText } from "../util/sanitize"
+import { safeTruncate, sanitizeText } from "../util/sanitize"
 
 function toolCallCount(events: TraceEvent[]): number {
   return events.filter((e) => e.type === "tool_call").length
@@ -11,7 +11,7 @@ export function formatPersonaAnswer(r: RunResult): string {
   const cites = top
     .map((c) => {
       const date = c.ts.toISOString().slice(0, 10)
-      const snippet = sanitizeText(c.text).slice(0, 120).replace(/\n/g, " ")
+      const snippet = safeTruncate(c.text, 120).replace(/\n/g, " ")
       return `> _from your ${c.source} (${date}): "${snippet}..."_`
     })
     .join("\n")

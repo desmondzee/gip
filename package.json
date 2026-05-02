@@ -11,8 +11,14 @@
     "seed": "bun scripts/seed-fake.ts",
     "questions": "bun scripts/run-questions.ts",
     "ensure-indexes": "bun scripts/ensure-indexes.ts",
+    "backfill-from-user": "bun scripts/backfill-from-user.ts",
+    "train-lora": "bun scripts/train-lora.ts",
     "mcp": "bun bin/mcp-persona.ts",
-    "smoke-mcp": "bun scripts/smoke-mcp.ts"
+    "smoke-mcp": "bun scripts/smoke-mcp.ts",
+    "smoke-train-lora": "bun scripts/smoke-train-lora.ts",
+    "smoke-search-voice": "bun scripts/smoke-search-voice.ts",
+    "smoke-cameo-3layer": "bun scripts/smoke-cameo-3layer.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",
@@ -23,6 +29,8 @@
     "next": "^16.2.4",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "zod": "^4.4.2"
   },
   "devDependencies": {

@@ -30,17 +30,6 @@ async function calendar() {
   console.log(JSON.stringify(result, null, 2).slice(0, 4000))
 }
 
-async function slack() {
-  console.log(`\n=== SLACK_LIST_CONVERSATIONS for ${userId} ===`)
-  const result: any = await client.tools.execute("SLACK_LIST_CONVERSATIONS", {
-    userId,
-    arguments: { limit: 5 },
-    dangerouslySkipVersionCheck: true,
-  })
-  console.log("top-level keys:", Object.keys(result ?? {}))
-  console.log(JSON.stringify(result, null, 2).slice(0, 4000))
-}
-
 async function listConnected() {
   console.log(`\n=== connected accounts for ${userId} ===`)
   try {
@@ -60,15 +49,12 @@ if (sourceArg === "all") {
   await listConnected()
   await gmail()
   await calendar()
-  await slack()
 } else if (sourceArg === "accounts") {
   await listConnected()
 } else if (sourceArg === "gmail") {
   await gmail()
 } else if (sourceArg === "calendar") {
   await calendar()
-} else if (sourceArg === "slack") {
-  await slack()
 } else {
-  console.log("usage: bun scripts/debug-composio.ts [accounts|gmail|calendar|slack|all]")
+  console.log("usage: bun scripts/debug-composio.ts [accounts|gmail|calendar|all]")
 }

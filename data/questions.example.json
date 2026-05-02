@@ -9,7 +9,7 @@
     "id": "q02",
     "category": "recall",
     "question": "Which AI framework did I drop in favor of native API calls?",
-    "ground_truth": "LangChain — I posted on Slack 'switched off the langchain agent entirely and latency dropped 40%', and the corresponding GitHub commit reads 'refactor: drop langchain in favor of native anthropic SDK'."
+    "ground_truth": "LangChain — the GitHub commit reads 'refactor: drop langchain in favor of native anthropic SDK'. Native Anthropic SDK won on latency by a wide margin."
   },
   {
     "id": "q03",
@@ -32,14 +32,14 @@
   {
     "id": "q06",
     "category": "preference",
-    "question": "How do I feel about meetings that could've been a Slack message?",
-    "ground_truth": "Annoyed — I posted on the lab Slack: 'if i have one more 4-person standup that could've been a slack message i'm going to lose it.'"
+    "question": "How do I feel about meetings that could've just been a message?",
+    "ground_truth": "Annoyed — small 4-person standups feel like a tax. I'd rather get the same info in a DM and keep the deep-work block."
   },
   {
     "id": "q07",
     "category": "preference",
     "question": "Who's my favorite working movie director?",
-    "ground_truth": "Denis Villeneuve — I said it directly on Slack after rewatching Dune Part 2: 'denis villeneuve is now my favorite working director, it's not even close.'"
+    "ground_truth": "Denis Villeneuve — after rewatching Dune Part 2 I locked it in. Not even close."
   },
   {
     "id": "q08",
@@ -98,8 +98,8 @@
   {
     "id": "q17",
     "category": "voice",
-    "question": "A teammate on Slack asks 'should we just use LangChain for this agent?' — respond.",
-    "ground_truth": "Skeptical, with receipts. My actual Slack quote: 'honestly the new claude tool use just works, switched off the langchain agent entirely and latency dropped 40%.' I'd push for native Anthropic SDK."
+    "question": "A teammate DMs me 'should we just use LangChain for this agent?' — respond.",
+    "ground_truth": "Skeptical, with receipts. The native Claude tool use just works — switched off the LangChain agent entirely and latency dropped ~40%. I'd push for native Anthropic SDK."
   },
   {
     "id": "q18",
@@ -117,6 +117,6 @@
     "id": "q20",
     "category": "prediction",
     "question": "If a recruiter asked 'are you AI-pilled?', what would my profile actually signal?",
-    "ground_truth": "Yes, deeply — claude-code-source-code and AI-Ethical-Debate-Arena repos on GitHub, multiple Anthropic-launch Reels on Instagram, a Slack post about ditching LangChain for raw Claude tool use, and ElevenLabs hackathon credits + Agentic Evolution Hackathon emails in my inbox. The signal is unambiguous."
+    "ground_truth": "Yes, deeply — claude-code-source-code and AI-Ethical-Debate-Arena repos on GitHub, a 'drop langchain in favor of native anthropic SDK' commit, multiple Anthropic-launch Reels on Instagram, and ElevenLabs hackathon credits + Agentic Evolution Hackathon emails in my inbox. The signal is unambiguous."
   }
 ]

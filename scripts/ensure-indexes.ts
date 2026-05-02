@@ -30,26 +30,43 @@ async function main() {
       const haveVector = existing.some((i) => i.name === vectorIndexName)
       const haveText = existing.some((i) => i.name === textIndexName)
 
+      const vectorIndexDefinition = {
+        fields: [
+          {
+            type: "vector" as const,
+            path: "embedding",
+            numDimensions: EMBED_DIM,
+            similarity: "cosine" as const,
+          },
+          { type: "filter" as const, path: "source" },
+          { type: "filter" as const, path: "ts" },
+          // Voice memory layer: search_voice filters at the index level
+          // (eng review 4A) so the per-cameo cost stays under budget.
+          { type: "filter" as const, path: "metadata.from_user" },
+        ],
+      }
+
       if (!haveVector) {
         await col.createSearchIndex({
           name: vectorIndexName,
           type: "vectorSearch",
-          definition: {
-            fields: [
-              {
-                type: "vector",
-                path: "embedding",
-                numDimensions: EMBED_DIM,
-                similarity: "cosine",
-              },
-              { type: "filter", path: "source" },
-              { type: "filter", path: "ts" },
-            ],
-          },
+          definition: vectorIndexDefinition,
         })
         console.log(`[${source}] created ${vectorIndexName}`)
       } else {
-        console.log(`[${source}] ${vectorIndexName} exists`)
+        // Update so the from_user filter is added to indexes that pre-date the voice layer
+        try {
+          await col.updateSearchIndex(vectorIndexName, vectorIndexDefinition)
+          console.log(`[${source}] updated ${vectorIndexName} (metadata.from_user filter ensured)`)
+        } catch (e) {
+          // updateSearchIndex throws if the definition matches — benign
+          const msg = e instanceof Error ? e.message : String(e)
+          if (!msg.toLowerCase().includes("no change")) {
+            console.warn(`[${source}] ${vectorIndexName} update warning: ${msg}`)
+          } else {
+            console.log(`[${source}] ${vectorIndexName} unchanged`)
+          }
+        }
       }
 
       if (!haveText) {

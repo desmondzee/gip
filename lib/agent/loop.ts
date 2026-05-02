@@ -1,8 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk"
-import { TOOL_DEFS, dispatchTool } from "./tools"
-import { systemPrompt } from "./prompts"
+import { TOOL_DEFS, dispatchTool, isUserAuthored } from "./tools"
+import { systemPrompt, voicePromptMessages } from "./prompts"
 import { classifyQuestion } from "./classify"
+import { chat as togetherChat, TogetherError } from "../voice/together-client"
+import { chat as geminiChat, voicerModel as geminiVoicerModel, GeminiError } from "../voice/gemini-client"
 import type { CandidateScore, SearchHit, ToolName, TraceEvent } from "../schemas"
+import { safeTruncate } from "../util/sanitize"
 
 const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6"
 const DEFAULT_USER_NAME = process.env.PERSONA_USER_NAME ?? "the user"
@@ -142,7 +145,7 @@ export async function runAgent(
           match_kind: h.match_kind,
           ts: h.ts,
           source: h.source,
-          text_preview: h.text.slice(0, 80),
+          text_preview: safeTruncate(h.text, 80),
         }))
 
         emit({
@@ -164,8 +167,19 @@ export async function runAgent(
 
         if (toolName === "summarize_for_answer") {
           const raw = result.raw as { answer: string; citation_ids: string[]; citations: SearchHit[] }
-          finalAnswer = raw.answer
           finalCitations = raw.citations
+          // Voicing phase (eng review 1A): if PERSONA_LORA_ADAPTER is set,
+          // route the draft through Together AI for cadence rewriting. On
+          // any failure, fall back to the draft — the layered fallback
+          // (premise 6) keeps the demo intact even when the LoRA leg breaks.
+          finalAnswer = await voicePhase({
+            userName,
+            question,
+            draftAnswer: raw.answer,
+            citations: raw.citations,
+            emit,
+            startMs: start,
+          })
           status = "done"
           didTerminate = true
           emit({
@@ -194,5 +208,145 @@ export async function runAgent(
     total_ms: Date.now() - start,
     status,
     error: errorMsg,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Voicing phase (eng review 1A)
+//
+// Splits the agent's citations into events vs voice exemplars, builds the
+// voicing prompt (eng review 1C — has_voice_exemplars flag included), and
+// routes through whichever voicer is configured. The fallback path is one
+// branch — the design's "layered fallback" (premise 6) is implemented here:
+// any voicer failure returns the draft unchanged.
+//
+// Voicer routing is by PERSONA_VOICER env:
+//   - "off" / unset       → passthrough (default)
+//   - "gemini"            → Gemini generateContent (in-context voicing)
+//   - "together"          → Together AI LoRA adapter (learned-weights voicing)
+// ---------------------------------------------------------------------------
+
+// Gemini 2.5 thinking-mode calls routinely take 4-10s. Together LoRA
+// serverless is faster (1-3s warm) but cold-start can hit 30s. Default 15s
+// covers both warm paths; override with PERSONA_VOICE_TIMEOUT_MS for tighter
+// or looser limits.
+const VOICE_TIMEOUT_MS = Number(process.env.PERSONA_VOICE_TIMEOUT_MS ?? "15000")
+
+type Voicer = "off" | "gemini" | "together"
+
+function resolvedVoicer(): { voicer: Voicer; modelLabel: string } {
+  const raw = (process.env.PERSONA_VOICER ?? "").trim().toLowerCase()
+  if (raw === "gemini") return { voicer: "gemini", modelLabel: geminiVoicerModel() }
+  if (raw === "together") {
+    const adapter = process.env.PERSONA_LORA_ADAPTER?.trim() ?? ""
+    return { voicer: "together", modelLabel: adapter || "(unset adapter)" }
+  }
+  // Backwards-compat: a bare PERSONA_LORA_ADAPTER without PERSONA_VOICER
+  // implies the original Together-only path. Keeps the prior cameo working
+  // even after this file picks up the new dispatch.
+  if (!raw && process.env.PERSONA_LORA_ADAPTER?.trim()) {
+    return { voicer: "together", modelLabel: process.env.PERSONA_LORA_ADAPTER.trim() }
+  }
+  return { voicer: "off", modelLabel: "passthrough" }
+}
+
+export function voicerLabel(): string {
+  const r = resolvedVoicer()
+  return r.voicer === "off" ? "off" : `${r.voicer}:${r.modelLabel}`
+}
+
+interface VoicePhaseInput {
+  userName: string
+  question: string
+  draftAnswer: string
+  citations: SearchHit[]
+  emit: (e: TraceEvent) => void
+  startMs: number
+}
+
+async function voicePhase(i: VoicePhaseInput): Promise<string> {
+  const { voicer, modelLabel } = resolvedVoicer()
+  if (voicer === "off") return i.draftAnswer // passthrough — voicing disabled
+
+  // Split citations: voice exemplars are user-authored; events are everything else.
+  const voiceHits = i.citations.filter(isUserAuthored)
+  const eventHits = i.citations.filter((c) => !isUserAuthored(c))
+  const hasVoiceExemplars = voiceHits.length > 0
+
+  const t0 = Date.now()
+  i.emit({
+    type: "thinking",
+    text:
+      `voicing via ${voicer} (${modelLabel}) — ${eventHits.length} events, ` +
+      `${voiceHits.length} voice exemplars${hasVoiceExemplars ? "" : " (NONE — empty-voice path)"}`,
+    t: t0 - i.startMs,
+  })
+
+  const prompt = voicePromptMessages({
+    userName: i.userName,
+    question: i.question,
+    draftAnswer: i.draftAnswer,
+    eventFacts: eventHits.map((h) => ({
+      source: h.source,
+      ts: new Date(h.ts).toISOString(),
+      text: h.text,
+    })),
+    voiceExemplars: voiceHits.map((h) => ({
+      source: h.source,
+      ts: new Date(h.ts).toISOString(),
+      text: h.text,
+    })),
+    hasVoiceExemplars,
+  })
+
+  try {
+    let rewritten: string
+    if (voicer === "together") {
+      rewritten = await togetherChat({
+        model: modelLabel,
+        messages: [
+          { role: "system", content: prompt.system },
+          { role: "user", content: prompt.user },
+        ],
+        max_tokens: 400,
+        temperature: 0.7,
+        timeoutMs: VOICE_TIMEOUT_MS,
+      })
+    } else {
+      // Gemini — in-context voicer using the existing GEMINI_API_KEY.
+      // System instruction goes in systemInstruction; user prompt becomes
+      // the only user-role turn (gemini-client maps the shape internally).
+      // Higher token budget than Together because gemini-2.5-* spends
+      // budget on internal thinking before emitting output.
+      rewritten = await geminiChat({
+        model: modelLabel,
+        messages: [
+          { role: "system", content: prompt.system },
+          { role: "user", content: prompt.user },
+        ],
+        max_tokens: 4000,
+        temperature: 0.7,
+        timeoutMs: VOICE_TIMEOUT_MS,
+      })
+    }
+    i.emit({
+      type: "thinking",
+      text: `voicing ok in ${Date.now() - t0}ms — ${voicer} rewrote draft (${i.draftAnswer.length}ch → ${rewritten.length}ch)`,
+      t: Date.now() - i.startMs,
+    })
+    return rewritten
+  } catch (err) {
+    const msg =
+      err instanceof TogetherError || err instanceof GeminiError
+        ? `${err.message}${err.status ? ` (status ${err.status})` : ""}`
+        : err instanceof Error
+          ? err.message
+          : String(err)
+    i.emit({
+      type: "thinking",
+      text: `voicing failed in ${Date.now() - t0}ms — ${safeTruncate(msg, 240)}; falling back to draft`,
+      t: Date.now() - i.startMs,
+    })
+    return i.draftAnswer
   }
 }

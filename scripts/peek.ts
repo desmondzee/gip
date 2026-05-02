@@ -2,7 +2,6 @@ import { memoriesOf, closeDb } from "../lib/db"
 
 async function main() {
   const cal = await memoriesOf("calendar_events")
-  const sl = await memoriesOf("slack_msgs")
 
   console.log("=== CALENDAR — top recurring titles (last 12 mo) ===")
   const since = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000)
@@ -35,22 +34,6 @@ async function main() {
     .toArray()
   for (const e of upcoming) {
     console.log(`  ${e.ts.toISOString().slice(0, 16)}  ${e.text.slice(0, 100)}`)
-  }
-
-  console.log("\n=== SLACK — non-system messages with real text ===")
-  const nontrivial = await sl
-    .find({
-      text: {
-        $not: /(has joined the channel|has left the channel|has renamed the channel|set the channel)/i,
-      },
-    })
-    .sort({ ts: -1 })
-    .limit(20)
-    .toArray()
-  for (const m of nontrivial) {
-    const ts = m.ts.toISOString().slice(0, 16)
-    const ch = (m.metadata as any)?.channel_name ?? "?"
-    console.log(`  ${ts}  #${ch}: ${m.text.replace(/\s+/g, " ").slice(0, 140)}`)
   }
 
   await closeDb()

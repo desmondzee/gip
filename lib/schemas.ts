@@ -69,6 +69,7 @@ export type TraceEvent =
 
 export type ToolName =
   | "search"
+  | "search_voice"
   | "rerank"
   | "rechunk"
   | "cross_reference"

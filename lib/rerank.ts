@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk"
 import type { SearchHit } from "./schemas"
+import { safeTruncate } from "./util/sanitize"
 
 const RERANK_MODEL = process.env.ANTHROPIC_RERANK_MODEL ?? "claude-haiku-4-5"
 const PREVIEW_CHARS = 220
@@ -22,7 +23,7 @@ export async function llmRerank(query: string, hits: SearchHit[]): Promise<Reran
     idx: i,
     id: h._id,
     src: h.source,
-    text: h.text.slice(0, PREVIEW_CHARS).replace(/\s+/g, " ").trim(),
+    text: safeTruncate(h.text, PREVIEW_CHARS).replace(/\s+/g, " ").trim(),
   }))
 
   const prompt = `Score each candidate 0-10 for how well it answers the QUERY. 10 = directly answers. 5 = related context. 0 = irrelevant.
