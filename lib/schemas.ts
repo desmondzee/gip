@@ -23,6 +23,15 @@ export interface SearchHit {
   match_kind: "vector" | "text" | "hybrid"
 }
 
+export interface CandidateScore {
+  id: string
+  score: number
+  match_kind: "vector" | "text" | "hybrid"
+  ts?: Date
+  source?: SourceName
+  text_preview?: string
+}
+
 export interface RetrievalTrace {
   question_id: string
   question_text: string
@@ -51,6 +60,8 @@ export type TraceEvent =
       result_summary: string
       latency_ms: number
       t: number
+      hit_ids?: string[]
+      candidates?: CandidateScore[]
     }
   | { type: "thinking"; text: string; t: number }
   | { type: "answer"; text: string; citation_ids: string[]; t: number }

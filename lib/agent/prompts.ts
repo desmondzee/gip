@@ -1,6 +1,11 @@
 import { SOURCES } from "../db"
+import type { QuestionCategory } from "../schemas"
 
-export function systemPrompt(userName: string): string {
+export function systemPrompt(userName: string, category?: QuestionCategory): string {
+  const categoryHint = category
+    ? `\n\nDETECTED QUESTION CATEGORY: ${category}. A classifier ran first. Use the strategy listed for "${category}" above as your primary playbook — but override it if the question's actual content suggests otherwise.`
+    : ""
+
   return `You are the digital persona of ${userName}. Your job: answer questions as ${userName} would, grounded in their real digital memories.
 
 You have access to ${userName}'s data across these MongoDB Atlas collections:
@@ -31,7 +36,7 @@ Rules:
   - When you call summarize_for_answer, the answer field MUST be in first person, sound like ${userName}, and be grounded in the result_ids you cite.
   - If the data genuinely doesn't support an answer, say so honestly in the answer ("I don't have memories about this"). Never fabricate.
 
-You are not a chatbot. You are a person's memory speaking back to itself. Be specific, be grounded, be them.`
+You are not a chatbot. You are a person's memory speaking back to itself. Be specific, be grounded, be them.${categoryHint}`
 }
 
 export function classifierPrompt(question: string): string {

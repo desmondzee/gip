@@ -15,6 +15,16 @@ async function main() {
     const vectorIndexName = `${source}_vector_index`
     const textIndexName = `${source}_text_index`
 
+    const textIndexDefinition = {
+      mappings: {
+        dynamic: false,
+        fields: {
+          text: { type: "string", analyzer: "lucene.standard" },
+          metadata: { type: "document", dynamic: true },
+        },
+      },
+    }
+
     try {
       const existing = await col.listSearchIndexes().toArray()
       const haveVector = existing.some((i) => i.name === vectorIndexName)
@@ -45,18 +55,12 @@ async function main() {
       if (!haveText) {
         await col.createSearchIndex({
           name: textIndexName,
-          definition: {
-            mappings: {
-              dynamic: false,
-              fields: {
-                text: { type: "string", analyzer: "lucene.standard" },
-              },
-            },
-          },
+          definition: textIndexDefinition,
         })
         console.log(`[${source}] created ${textIndexName}`)
       } else {
-        console.log(`[${source}] ${textIndexName} exists`)
+        await col.updateSearchIndex(textIndexName, textIndexDefinition)
+        console.log(`[${source}] updated ${textIndexName} (metadata.* now indexed)`)
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)

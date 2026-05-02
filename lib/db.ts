@@ -10,6 +10,13 @@ export const SOURCES = [
   "slack_msgs",
   "notion_docs",
   "github_activity",
+  "gdrive_files",
+  "gdocs_pages",
+  "gsheets_sheets",
+  "linkedin_profile",
+  "youtube_activity",
+  "discord_servers",
+  "instagram_posts",
   "maps_history",
   "photos_meta",
 ] as const

@@ -2,121 +2,121 @@
   {
     "id": "q01",
     "category": "recall",
-    "question": "How many tutoring sessions with Denzel do I have on my calendar in the last year?",
-    "ground_truth": "Around 19 — Tutoring Denzel is one of my most frequently recurring events."
+    "question": "What's my Instagram handle?",
+    "ground_truth": "@weiweiatoxford — Engineering at Oxford, Trinity College, 🇨🇳-🇨🇦-🇬🇧, documenting student life and tech."
   },
   {
     "id": "q02",
     "category": "recall",
-    "question": "What's the next thing on my calendar?",
-    "ground_truth": "Coffee with Sam at Blue Bottle SoMa, 30 min, on May 5."
+    "question": "Which hackathon did I win the $10k top prize at?",
+    "ground_truth": "ETH Oxford (hosted by HomeDAO). I posted '5 rules we used to win the $10k top prize at ETH Oxford' and 'Winning ETH Oxford hosted by HomeDAO was the goal. We did it.'"
   },
   {
     "id": "q03",
     "category": "recall",
-    "question": "What hackathons have I been to recently?",
-    "ground_truth": "I've got at least four Hackathon entries on my calendar over the past several months."
+    "question": "What summer program did I draft a 2026 proposal for?",
+    "ground_truth": "Google Summer of Code — there's a doc in my Drive called 'GSoC2026ProposalYuzhongLuo'."
   },
   {
     "id": "q04",
     "category": "recall",
-    "question": "What was the YC-related masterclass on my calendar about?",
-    "ground_truth": "It was a masterclass titled 'How to Be a Founding Engineer for a YC Startup'."
+    "question": "Do I have a GitHub repo built around Claude Code's source?",
+    "ground_truth": "Yes — pig8pig/claude-code-source-code. The description literally says 'Claude code source code'."
   },
   {
     "id": "q05",
     "category": "recall",
-    "question": "What engineering module am I in?",
-    "ground_truth": "P5 — I have P5 Engineering in Practice (with Hari), P5 Mechanical Laboratory (Richards), and the Professional Engineering Skills Workshop on my calendar."
+    "question": "Where do I study?",
+    "ground_truth": "Oxford — Engineering at Trinity College. It's in my Instagram bio, my CV docs, and shows up in IG captions like 'POV: You walk into your Oxford Engineering lecture' and 'Oxbridge boat race vlog 2026'."
   },
   {
     "id": "q06",
     "category": "preference",
-    "question": "Who do I tutor most often?",
-    "ground_truth": "Denzel — Tutoring Denzel is by far my most recurring tutoring event. I also tutor Claire and Angela less frequently."
+    "question": "What do I post most on Instagram?",
+    "ground_truth": "Reels about hackathons (winning ETH Oxford, IC Hack 26, the UK's biggest quant hackathon) and AI commentary (Anthropic news, AI-and-jobs takes), with some Oxford student-life moments mixed in."
   },
   {
     "id": "q07",
     "category": "preference",
-    "question": "What sport do I play regularly?",
-    "ground_truth": "Badminton — Vector Badminton is on my calendar 15+ times, plus other Badminton sessions."
+    "question": "Which Mandopop artist do I subscribe to most prominently on YouTube?",
+    "ground_truth": "Jay Chou (周杰倫) — direct subscription. I also follow Eric Chou (周興哲)."
   },
   {
     "id": "q08",
     "category": "preference",
-    "question": "Do I tend to eat in Hall more often for lunch or for breakfast?",
-    "ground_truth": "Lunch — I have ~37 'Lunch @ Hall' entries vs ~33 'Breakfast' entries. Lunch wins, though it's close."
+    "question": "What sport am I most invested in?",
+    "ground_truth": "Badminton — Trinity Badminton 2025-26 sign-up sheet in Drive, BWF TV and Badminton Insight on my YouTube subs, and badminton sessions on the calendar."
   },
   {
     "id": "q09",
     "category": "preference",
-    "question": "What kinds of side projects have I worked on?",
-    "ground_truth": "Computer Vision projects (multiple sessions), Arduino, and a Java AP project — all on my calendar."
+    "question": "What's the dominant theme across my GitHub side projects?",
+    "ground_truth": "AI and hackathon-style work — AI-Ethical-Debate-Arena (x2), neuro-cue-companion, HackEurope-NeuroSeek, Quantihack, Neurohack-2026, claude-code-source-code, trading_ai_single_asset. Almost everything is AI-flavored or hackathon-bred."
   },
   {
     "id": "q10",
     "category": "preference",
-    "question": "Do I do most of my serious studying through 'Pset', 'Study', or 'Prereading'?",
-    "ground_truth": "All three appear regularly — Pset and Prereading both around 6× each, Study around 5×. I split work across all three rather than picking one."
+    "question": "When I plan trips, do I lean Asia or Europe?",
+    "ground_truth": "Europe — Italy 2026 expenses, Italy TimeSaver Travel Planner, and Europe Travel Planner 2025 are all in my Sheets. No Asia equivalents."
   },
   {
     "id": "q11",
     "category": "opinion",
-    "question": "How active am I as a poster on the robotics lab Slack?",
-    "ground_truth": "Not very — most non-system messages I see are from other lab members (admin announcements, internship postings, infra updates). I'm more of a reader there."
+    "question": "Are hackathons just coding competitions, in my view?",
+    "ground_truth": "No — I've posted explicitly 'Stop treating hackathons like coding competitions.' My take: pitch, time management, and team execution decide who wins. That's how we took ETH Oxford."
   },
   {
     "id": "q12",
     "category": "opinion",
-    "question": "What's the vibe of the robotics lab Slack workspace I'm in?",
-    "ground_truth": "Mostly an academic robotics group at Oxford — admin notices about server outages and lab equipment, internship postings, occasional dataset/help requests."
+    "question": "How do I feel about AI's impact on jobs?",
+    "ground_truth": "Concerned and tracking it closely. I've posted 'Are we all cooked?', referenced Anthropic's claim that AI would write 90% of code within 6 months, and noted that 300M jobs are at risk. I treat it as a real signal, not hype."
   },
   {
     "id": "q13",
     "category": "decision",
-    "question": "Do I have time for a coffee chat in the next two weeks?",
-    "ground_truth": "Yes — my upcoming calendar is light, with only Coffee with Sam scheduled at Blue Bottle SoMa. There's plenty of slack for one more."
+    "question": "Should I do another hackathon next month?",
+    "ground_truth": "Yes — recent pattern is strong: ETH Oxford win ($10k), IC Hack 26, finalist at the UK's biggest quant hackathon (800 entered online). I'm clearly in a hackathon era."
   },
   {
     "id": "q14",
     "category": "decision",
-    "question": "Should I take on another tutoring student right now?",
-    "ground_truth": "Probably not — I already have recurring sessions for Denzel, Claire, Angela, and a Math Tutoring slot. Adding another would crowd the schedule."
+    "question": "Should I follow through on my GSoC 2026 application?",
+    "ground_truth": "Yes — the proposal is already drafted in Drive, and it fits the pattern: lots of open-source-style projects on GitHub, strong AI focus."
   },
   {
     "id": "q15",
     "category": "decision",
-    "question": "Should I pick up a new sport this term, or keep going with what I do?",
-    "ground_truth": "Stick with badminton — Vector Badminton is already a regular fixture on my calendar and I clearly enjoy it."
+    "question": "Should I plan a trip to Italy soon?",
+    "ground_truth": "Yes — I already have an Italy 2026 expenses sheet and a TimeSaver Travel Planner spun up. Logistics are halfway done."
   },
   {
     "id": "q16",
     "category": "voice",
-    "question": "Reply to a friend asking what a typical weekday looks like for me.",
-    "ground_truth": "Pretty packed: Breakfast in Hall, P5 lectures and labs (Engineering in Practice, Mechanical Lab, Professional Skills), tutoring sessions in the afternoon (usually Denzel), Lunch and Dinner in Hall, then Pset/Study in the evening. Badminton when I can fit it in."
+    "question": "Reply to a friend who DMs me: 'yo Anthropic just dropped something new.'",
+    "ground_truth": "Hyped, urgent, framing it as a moment — like my Insta voice on AI launches: 'Anthropic just released a monster…' / '512,000 lines of code. A government warning.' Short, energetic, focused on what just changed."
   },
   {
     "id": "q17",
     "category": "voice",
-    "question": "Reply to a Slack DM asking 'what kind of projects are you into?'",
-    "ground_truth": "Mostly engineering and ML — I've been working on computer vision projects, some Arduino stuff, and the P5 engineering coursework. Hackathon-curious too — I've done a few recently."
+    "question": "Respond on Slack to someone asking 'what kind of projects are you into?'",
+    "ground_truth": "AI and hackathon stuff mostly — claude-code-source-code, AI-Ethical-Debate-Arena, neuro-cue-companion, plus Oxford P5 engineering coursework. Casual, enthusiastic, lists the projects without overselling."
   },
   {
     "id": "q18",
     "category": "prediction",
-    "question": "If a YC scout asked me 'are you the founding-engineer type?' — based on what's on my calendar, what would I likely say?",
-    "ground_truth": "Probably yes, based on signal — I went to a masterclass on being a founding engineer for a YC startup, I've done multiple hackathons, and I've got real CV / Arduino project work in addition to coursework. The pattern points that way."
+    "question": "If a quant firm recruiter reaches out, am I likely to engage?",
+    "ground_truth": "Yes — I've got Quantihack and imc-prosperity-3 repos, and an Insta post from the UK's biggest quant hackathon where I made the finals out of 800 online entrants. Quant is on my radar."
   },
   {
     "id": "q19",
     "category": "prediction",
-    "question": "If someone asks what I do for fun, what would I say?",
-    "ground_truth": "Badminton, hackathons, and side projects — Computer Vision and Arduino stuff. Tutoring is also a steady part of my week, though that's more for income/structure than 'fun'."
+    "question": "If a friend asked 'are you more startup or big tech?', which way would I lean?",
+    "ground_truth": "Startup-leaning, but I'm openly torn. My Insta post 'Quant. Startups. Big Tech. Every path makes you feel like you're missing out' captures the ambivalence — but the hackathon wins, side projects, and ETH Oxford VC interest tilt me toward startups."
   },
   {
     "id": "q20",
     "category": "prediction",
-    "question": "Given my workload, would I be likely to say yes to a Sunday hackathon next month?",
-    "ground_truth": "Likely yes — I have a Hackathon entry already on the calendar four times in recent history, plus the YC founding-engineer masterclass, so I lean toward saying yes when one comes up. Sunday Carvery would have to wait."
+    "question": "If someone asked me to recommend a Mandopop song, who would I name first?",
+    "ground_truth": "Jay Chou — he's my anchor subscription. Eric Chou would be the second pick."
   }
 ]

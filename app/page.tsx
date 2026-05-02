@@ -34,7 +34,20 @@ function formatSeconds(ms?: number): string {
   return `${(ms / 1000).toFixed(1)}s`
 }
 
-const SOURCES = ["gmail_msgs", "calendar_events", "slack_msgs"] as const
+const SOURCES = [
+  "gmail_msgs",
+  "calendar_events",
+  "slack_msgs",
+  "notion_docs",
+  "github_activity",
+  "gdrive_files",
+  "gdocs_pages",
+  "gsheets_sheets",
+  "linkedin_profile",
+  "youtube_activity",
+  "discord_servers",
+  "instagram_posts",
+] as const
 type IngestSource = (typeof SOURCES)[number]
 type IngestStatus = "idle" | "running" | "done" | "error"
 type ConnectStatus = "unknown" | "checking" | "connected" | "not_connected" | "error"
@@ -59,6 +72,9 @@ export default function Page() {
   const [connectUrls, setConnectUrls] = useState<Record<IngestSource, string>>(
     () => Object.fromEntries(SOURCES.map((s) => [s, ""])) as Record<IngestSource, string>
   )
+  // Bumped when an ingest changes memory. VectorField re-fetches the layout
+  // when this changes so newly-ingested chunks show up in the scatter.
+  const [layoutVersion, setLayoutVersion] = useState(0)
 
   const checkConnection = useCallback(async (source: IngestSource) => {
     setConnectStatus((p) => ({ ...p, [source]: "checking" }))
@@ -97,6 +113,9 @@ export default function Page() {
       if (!res.ok) throw new Error(data.error ?? res.statusText)
       setIngestMsg((p) => ({ ...p, [source]: `+${data.inserted} new, ~${data.updated} updated` }))
       setIngestStatus((p) => ({ ...p, [source]: "done" }))
+      if ((data.inserted ?? 0) > 0 || (data.updated ?? 0) > 0) {
+        setLayoutVersion((v) => v + 1)
+      }
       checkConnection(source)
     } catch (err) {
       setIngestMsg((p) => ({ ...p, [source]: err instanceof Error ? err.message : String(err) }))
@@ -281,7 +300,7 @@ export default function Page() {
           const isConnected = cs === "connected"
           const notConnected = cs === "not_connected"
           const connectUrl = connectUrls[src]
-          const label = src.replace("_msgs", "").replace("_events", "")
+          const label = SOURCE_LABEL[src] ?? src.replace("_msgs", "").replace("_events", "")
           const dot =
             cs === "connected"
               ? "var(--match)"
@@ -391,7 +410,11 @@ export default function Page() {
 
         <main className="document" role="status" aria-live="polite" aria-atomic="false">
           {activeCard ? (
-            <Document card={activeCard} onRetry={() => activeIdx !== null && runOne(activeIdx)} />
+            <Document
+              card={activeCard}
+              onRetry={() => activeIdx !== null && runOne(activeIdx)}
+              layoutVersion={layoutVersion}
+            />
           ) : (
             <ColdStart onStart={() => runOne(0)} />
           )}
@@ -651,7 +674,15 @@ function ColdStart({ onStart }: { onStart: () => void }) {
   )
 }
 
-function Document({ card, onRetry }: { card: CardState; onRetry: () => void }) {
+function Document({
+  card,
+  onRetry,
+  layoutVersion,
+}: {
+  card: CardState
+  onRetry: () => void
+  layoutVersion: number
+}) {
   const { question, events, answer, status, total_ms, error_message } = card
   const correct = status === "done" && isMatch(answer, question.ground_truth)
 
@@ -666,7 +697,11 @@ function Document({ card, onRetry }: { card: CardState; onRetry: () => void }) {
           <button className="retry serif italic" onClick={onRetry}>Try again →</button>
         </section>
       ) : (
-        <TraceMap events={events} status={status} />
+        <>
+          <ClassifyChip events={events} />
+          <VectorField events={events} status={status} layoutVersion={layoutVersion} />
+          <CandidateBars events={events} />
+        </>
       )}
 
       {status !== "error" && (
@@ -765,16 +800,29 @@ function Document({ card, onRetry }: { card: CardState; onRetry: () => void }) {
   )
 }
 
-// ─── Knowledge graph (TraceMap) ─────────────────────────────────────────────
+// ─── Vector field — agent traversal of the embedding space ─────────────────
 
 const SOURCE_LABEL: Record<string, string> = {
-  gmail_msgs: "gmail",
-  calendar_events: "calendar",
-  slack_msgs: "slack",
-  notion_docs: "notion",
-  github_activity: "github",
-  maps_history: "maps",
-  photos_meta: "photos",
+  gmail_msgs: "Gmail",
+  calendar_events: "Calendar",
+  slack_msgs: "Slack",
+  notion_docs: "Notion",
+  github_activity: "GitHub",
+  gdrive_files: "Drive",
+  gdocs_pages: "Docs",
+  gsheets_sheets: "Sheets",
+  linkedin_profile: "LinkedIn",
+  youtube_activity: "YouTube",
+  discord_servers: "Discord",
+  instagram_posts: "Instagram",
+  maps_history: "Maps",
+  photos_meta: "Photos",
+}
+
+const MODE_LABEL: Record<string, string> = {
+  hybrid: "Hybrid",
+  vector: "Vector",
+  text: "Text",
 }
 
 const SOURCE_COLOR: Record<string, string> = {
@@ -783,302 +831,728 @@ const SOURCE_COLOR: Record<string, string> = {
   slack_msgs: "#7e5a8a",
   notion_docs: "#a08856",
   github_activity: "#5b5b5b",
+  gdrive_files: "#3b6fb6",
+  gdocs_pages: "#4574c4",
+  gsheets_sheets: "#3a8a4f",
+  linkedin_profile: "#0a66c2",
+  youtube_activity: "#cc3c3c",
+  discord_servers: "#5865f2",
+  instagram_posts: "#e1306c",
   maps_history: "#a85842",
   photos_meta: "#b06a82",
 }
 
-type BranchOp = {
-  index: number
-  kind: "rerank" | "rechunk" | "cross_reference"
-  label: string
-  detail: string
+interface VectorPoint {
+  id: string
+  source: string
+  x: number
+  y: number
+  ts: string
+  preview: string
 }
 
-type Branch = {
-  index: number
-  collection: string
-  query: string
-  hitCount: number
-  mode: string
-  ms: number
-  ops: BranchOp[]
+interface VectorLayout {
+  points: VectorPoint[]
+  generated_at: string
+  count_by_source: Record<string, number>
 }
+
+type Phase =
+  | {
+      kind: "search"
+      ordinal: number
+      tool_use_id: string
+      collection: string
+      query: string
+      mode: string
+      hit_ids: string[]
+      ms: number
+    }
+  | {
+      kind: "rerank"
+      tool_use_id: string
+      criterion: string
+      hit_ids: string[]
+      narrows: number | null
+    }
+  | {
+      kind: "cross_reference"
+      tool_use_id: string
+      on: string
+      hit_ids: string[]
+      narrows: number | null
+    }
 
 type ParsedTrace = {
-  classify?: { strategy: string; reasoning: string }
-  branches: Branch[]
-  synthesize?: { citations: number; ms: number; index: number }
-  liveIndex: number
-  hasAnyEvent: boolean
+  classify?: { strategy: string }
+  phases: Phase[]
+  liveSearchOrdinal: number | null
+  cited: string[]
+  synthesizeCount: number
+  hasAnswer: boolean
 }
 
-function parseTrace(events: TraceEvent[]): ParsedTrace {
-  const out: ParsedTrace = { branches: [], liveIndex: events.length - 1, hasAnyEvent: events.length > 0 }
-  const callsByUseId = new Map<string, { tool: string; args: Record<string, unknown>; index: number }>()
-  let cur: number | null = null
+function parseVectorTrace(events: TraceEvent[], status: Status): ParsedTrace {
+  const phases: Phase[] = []
+  const callArgs = new Map<string, Record<string, unknown>>()
+  let curSearch: number | null = null
+  let cited: string[] = []
+  let synthesizeCount = 0
+  let hasAnswer = false
+  let classify: ParsedTrace["classify"]
 
-  events.forEach((e, idx) => {
+  let searchOrdinal = 0
+
+  for (const e of events) {
     if (e.type === "classify") {
-      out.classify = { strategy: e.strategy, reasoning: e.reasoning }
+      classify = { strategy: e.strategy }
     } else if (e.type === "tool_call") {
-      callsByUseId.set(e.tool_use_id, { tool: e.tool, args: e.args, index: idx })
+      callArgs.set(e.tool_use_id, e.args)
     } else if (e.type === "tool_result") {
-      const call = callsByUseId.get(e.tool_use_id)
+      const args = callArgs.get(e.tool_use_id) ?? {}
       if (e.tool === "search") {
-        const m = e.result_summary.match(/^(\d+) hits/)
-        const hitCount = m ? parseInt(m[1] ?? "0", 10) : 0
-        const collection = (call?.args?.collection as string) ?? "default"
-        const mode = (call?.args?.mode as string) ?? "hybrid"
-        const query = (call?.args?.query as string) ?? ""
-        out.branches.push({ index: idx, collection, query, hitCount, mode, ms: e.latency_ms, ops: [] })
-        cur = out.branches.length - 1
+        searchOrdinal++
+        phases.push({
+          kind: "search",
+          ordinal: searchOrdinal,
+          tool_use_id: e.tool_use_id,
+          collection: (args.collection as string) ?? "unknown",
+          query: (args.query as string) ?? "",
+          mode: (args.mode as string) ?? "hybrid",
+          hit_ids: e.hit_ids ?? [],
+          ms: e.latency_ms,
+        })
+        curSearch = phases.length - 1
       } else if (e.tool === "rerank") {
-        const m = e.result_summary.match(/Reranked (\d+) items by (\w+)/)
-        if (cur !== null) {
-          out.branches[cur].ops.push({
-            index: idx,
-            kind: "rerank",
-            label: `↻ ${m?.[2] ?? "rerank"}`,
-            detail: `${m?.[1] ?? "?"} kept`,
-          })
-        }
-      } else if (e.tool === "rechunk") {
-        const m = e.result_summary.match(/into (\d+) (\w+) chunks/)
-        if (cur !== null) {
-          out.branches[cur].ops.push({
-            index: idx,
-            kind: "rechunk",
-            label: `↘ ${m?.[2] ?? "chunk"}`,
-            detail: `${m?.[1] ?? "?"} parts`,
-          })
-        }
+        phases.push({
+          kind: "rerank",
+          tool_use_id: e.tool_use_id,
+          criterion: (args.criterion as string) ?? "relevance",
+          hit_ids: e.hit_ids ?? [],
+          narrows: curSearch,
+        })
       } else if (e.tool === "cross_reference") {
-        const m = e.result_summary.match(/(\d+) cross-ref matches on (\w+)/)
-        if (cur !== null) {
-          out.branches[cur].ops.push({
-            index: idx,
-            kind: "cross_reference",
-            label: `⇄ on ${m?.[2] ?? "?"}`,
-            detail: `${m?.[1] ?? "0"} match`,
-          })
-        }
+        phases.push({
+          kind: "cross_reference",
+          tool_use_id: e.tool_use_id,
+          on: (args.on as string) ?? "topic",
+          hit_ids: e.hit_ids ?? [],
+          narrows: curSearch,
+        })
       } else if (e.tool === "summarize_for_answer") {
-        const m = e.result_summary.match(/\((\d+) citations\)/)
-        out.synthesize = { citations: parseInt(m?.[1] ?? "0", 10), ms: e.latency_ms, index: idx }
+        synthesizeCount++
       }
+    } else if (e.type === "answer") {
+      hasAnswer = true
+      cited = e.citation_ids
     }
-  })
-  return out
-}
-
-function dotPositions(count: number): Array<[number, number]> {
-  // arrange up to 10 dots inside a ~30-radius bubble
-  const positions: Array<[number, number]> = []
-  if (count <= 0) return positions
-  positions.push([0, 0])
-  if (count >= 2) positions.push([14, 0])
-  if (count >= 3) positions.push([-14, 0])
-  if (count >= 4) positions.push([0, 14])
-  if (count >= 5) positions.push([0, -14])
-  if (count >= 6) positions.push([10, 10])
-  if (count >= 7) positions.push([-10, 10])
-  if (count >= 8) positions.push([10, -10])
-  if (count >= 9) positions.push([-10, -10])
-  if (count >= 10) positions.push([18, 9])
-  return positions.slice(0, Math.min(count, 10))
-}
-
-function TraceMap({ events, status }: { events: TraceEvent[]; status: Status }) {
-  const parsed = useMemo(() => parseTrace(events), [events])
-  const VB_W = 800
-  const VB_H = 360
-  const QX = 60
-  const SX = 320
-  const AX = 720
-  const QY = VB_H / 2
-  const isLive = status === "running"
-
-  const branchY = (i: number, n: number): number => {
-    if (n <= 1) return QY
-    const top = 70
-    const bottom = VB_H - 70
-    return top + (bottom - top) * (i / (n - 1))
   }
 
-  const hasSynth = !!parsed.synthesize
-  const lastBranchIdx = parsed.branches.length - 1
-  const liveBranch =
-    isLive && !hasSynth && parsed.branches.length > 0 ? lastBranchIdx : -1
+  const isLive = status === "running"
+  const liveSearchOrdinal =
+    isLive && !hasAnswer
+      ? phases.filter((p) => p.kind === "search").at(-1)?.ordinal ?? null
+      : null
+
+  return { classify, phases, liveSearchOrdinal, cited, synthesizeCount, hasAnswer }
+}
+
+function VectorField({
+  events,
+  status,
+  layoutVersion = 0,
+}: {
+  events: TraceEvent[]
+  status: Status
+  layoutVersion?: number
+}) {
+  const [layout, setLayout] = useState<VectorLayout | null>(null)
+  const [layoutErr, setLayoutErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    setLayoutErr(null)
+    fetch(`/api/persona/layout${layoutVersion > 0 ? `?v=${layoutVersion}` : ""}`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`layout ${r.status}`)
+        return r.json()
+      })
+      .then((data: VectorLayout) => {
+        if (alive) setLayout(data)
+      })
+      .catch((e) => {
+        if (alive) setLayoutErr(e instanceof Error ? e.message : String(e))
+      })
+    return () => {
+      alive = false
+    }
+  }, [layoutVersion])
+
+  const parsed = useMemo(() => parseVectorTrace(events, status), [events, status])
+  const idIndex = useMemo(() => {
+    const m = new Map<string, VectorPoint>()
+    if (layout) for (const p of layout.points) m.set(p.id, p)
+    return m
+  }, [layout])
+
+  const VB_W = 900
+  const VB_H = 480
+  const PAD_X = 32
+  const PAD_Y = 44
+  const GUTTER_W = 360
+  const SCATTER_END = VB_W - GUTTER_W
+  const projX = useCallback(
+    (x: number) => PAD_X + ((x + 1) / 2) * (SCATTER_END - PAD_X * 2),
+    [PAD_X, SCATTER_END],
+  )
+  const projY = useCallback((y: number) => PAD_Y + ((y + 1) / 2) * (VB_H - 2 * PAD_Y), [])
+
+  // Per-point activation level. Last wave's hits are brightest; cited highest.
+  const activation = useMemo(() => {
+    const m = new Map<string, { level: number; phase: number; isCited: boolean }>()
+    const searches = parsed.phases.filter((p) => p.kind === "search") as Extract<Phase, { kind: "search" }>[]
+    searches.forEach((s, i) => {
+      const isLatest = i === searches.length - 1
+      const baseLvl = isLatest ? 1 : 0.55
+      const denom = Math.max(s.hit_ids.length - 1, 1)
+      s.hit_ids.forEach((id, rank) => {
+        // Top hit = baseLvl, lowest = 0.6 * baseLvl
+        const rankFactor = 1 - (rank / denom) * 0.4
+        const lvl = baseLvl * rankFactor
+        const cur = m.get(id)
+        if (!cur || lvl > cur.level) m.set(id, { level: lvl, phase: i, isCited: false })
+      })
+    })
+    // Reranks/cross-refs: don't add new points, but boost surviving ones.
+    for (const p of parsed.phases) {
+      if (p.kind === "rerank" || p.kind === "cross_reference") {
+        for (const id of p.hit_ids) {
+          const cur = m.get(id)
+          if (cur) m.set(id, { ...cur, level: Math.min(1, cur.level + 0.1) })
+        }
+      }
+    }
+    for (const id of parsed.cited) {
+      const cur = m.get(id) ?? { level: 1, phase: searches.length - 1, isCited: false }
+      m.set(id, { ...cur, level: 1, isCited: true })
+    }
+    return m
+  }, [parsed])
+
+  // Search-phase centroids for query whispers.
+  const searchPhases = parsed.phases.filter((p) => p.kind === "search") as Extract<Phase, { kind: "search" }>[]
+  const phaseCentroids = useMemo(() => {
+    return searchPhases.map((p) => {
+      const pts = p.hit_ids.map((id) => idIndex.get(id)).filter(Boolean) as VectorPoint[]
+      if (pts.length === 0) return null
+      let cx = 0
+      let cy = 0
+      for (const pt of pts) {
+        cx += pt.x
+        cy += pt.y
+      }
+      return { x: cx / pts.length, y: cy / pts.length, count: pts.length }
+    })
+  }, [searchPhases, idIndex])
+
+  // Cross-reference edges: lines between matched ids.
+  const crossEdges = useMemo(() => {
+    const edges: Array<{ a: VectorPoint; b: VectorPoint }> = []
+    for (const p of parsed.phases) {
+      if (p.kind !== "cross_reference") continue
+      const pts = p.hit_ids.map((id) => idIndex.get(id)).filter(Boolean) as VectorPoint[]
+      // Connect each unique cross-source pair, dedup by id pair.
+      for (let i = 0; i < pts.length; i++) {
+        for (let j = i + 1; j < pts.length; j++) {
+          const a = pts[i]!
+          const b = pts[j]!
+          if (a.source !== b.source) edges.push({ a, b })
+        }
+      }
+    }
+    return edges
+  }, [parsed.phases, idIndex])
+
+  if (!layout && !layoutErr) {
+    return (
+      <figure className="vfield">
+        <div className="vfield-empty serif italic">building the index map…</div>
+        <style jsx>{`
+          .vfield { margin: 0; padding: 8px 0; }
+          .vfield-empty {
+            min-height: 280px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--mute);
+            font-size: 14px;
+          }
+        `}</style>
+      </figure>
+    )
+  }
+
+  if (layoutErr) {
+    return (
+      <figure className="vfield">
+        <div className="vfield-empty serif italic">
+          couldn&apos;t load the index map — {layoutErr}
+        </div>
+        <style jsx>{`
+          .vfield { margin: 0; padding: 8px 0; }
+          .vfield-empty {
+            min-height: 240px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--differs);
+            font-size: 13px;
+          }
+        `}</style>
+      </figure>
+    )
+  }
+
+  const points = layout!.points
+  const isLive = status === "running"
 
   return (
-    <figure className="map">
+    <figure className="vfield">
       <svg
         viewBox={`0 0 ${VB_W} ${VB_H}`}
         preserveAspectRatio="xMidYMid meet"
         role="img"
-        aria-label="Map of the agent's reasoning across memory sources"
+        aria-label="The agent activating vectors across the embedding space"
       >
-        {/* Question node */}
-        <g>
-          <circle cx={QX} cy={QY} r="6" fill="var(--ink)" />
-          <text x={QX} y={QY + 24} textAnchor="middle" className="lbl">
-            question
-          </text>
-          {parsed.classify && (
-            <text x={QX} y={QY + 40} textAnchor="middle" className="lbl-italic">
-              as {parsed.classify.strategy}
-            </text>
-          )}
-        </g>
+        <defs>
+          <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="white" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="white" stopOpacity="0" />
+          </radialGradient>
+          <filter id="soft-glow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="2.5" />
+          </filter>
+        </defs>
 
-        {/* Empty state */}
-        {!parsed.hasAnyEvent && isLive && (
-          <text x={VB_W / 2} y={VB_H / 2} textAnchor="middle" className="lbl-italic-lg">
-            the agent is exploring…
-          </text>
-        )}
+        {/* Cross-reference chord lines, drawn underneath. */}
+        {crossEdges.map((e, i) => (
+          <line
+            key={`xr-${i}`}
+            x1={projX(e.a.x)}
+            y1={projY(e.a.y)}
+            x2={projX(e.b.x)}
+            y2={projY(e.b.y)}
+            stroke="var(--accent)"
+            strokeOpacity="0.6"
+            strokeWidth="1"
+            className="fade-up"
+          />
+        ))}
 
-        {/* Branches */}
-        {parsed.branches.map((b, i) => {
-          const sy = branchY(i, parsed.branches.length)
-          const color = SOURCE_COLOR[b.collection] ?? "var(--mute)"
-          const live = i === liveBranch
-          const sxEdge = SX - 32
-          const axEdge = SX + 32
-          // Question to source curve
-          const c1x = QX + (sxEdge - QX) * 0.55
-          const pathQS = `M ${QX + 6} ${QY} C ${c1x} ${QY}, ${sxEdge - 50} ${sy}, ${sxEdge} ${sy}`
-          // Source to answer curve
-          const c2x = axEdge + (AX - axEdge) * 0.45
-          const pathSA = `M ${axEdge} ${sy} C ${c2x} ${sy}, ${AX - 50} ${QY}, ${AX - 6} ${QY}`
-
+        {/* The full vector field — every chunk in the index. */}
+        {points.map((p) => {
+          const a = activation.get(p.id)
+          const lvl = a?.level ?? 0
+          const color = SOURCE_COLOR[p.source] ?? "var(--mute)"
+          const baseOpacity = 0.22
+          const r = lvl > 0 ? 3.2 + lvl * 1.6 : 1.8
+          const op = lvl > 0 ? Math.min(1, 0.7 + lvl * 0.3) : baseOpacity
           return (
-            <g key={b.index} className="fade-up">
-              <path
-                d={pathQS}
-                fill="none"
-                stroke={live ? "var(--accent)" : "var(--rule)"}
-                strokeWidth={live ? 1.4 : 1}
-                strokeLinecap="round"
-              />
-              <path
-                d={pathSA}
-                fill="none"
-                stroke={hasSynth ? color : "var(--rule)"}
-                strokeWidth={hasSynth ? 1.2 : 1}
-                strokeLinecap="round"
-                strokeOpacity={hasSynth ? 0.6 : 0.4}
-              />
-
-              {/* Source bubble */}
+            <g key={p.id}>
+              {a?.isCited && (
+                <circle
+                  cx={projX(p.x)}
+                  cy={projY(p.y)}
+                  r={11}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth="1.2"
+                  strokeOpacity="0.85"
+                />
+              )}
+              {lvl > 0.5 && (
+                <circle
+                  cx={projX(p.x)}
+                  cy={projY(p.y)}
+                  r={r * 2}
+                  fill={color}
+                  opacity={0.32}
+                  filter="url(#soft-glow)"
+                  className={a?.isCited || isLive ? "vec-pulse" : ""}
+                />
+              )}
               <circle
-                cx={SX}
-                cy={sy}
-                r="32"
-                fill="var(--bg)"
-                stroke={live ? "var(--accent)" : color}
-                strokeWidth={live ? 1.6 : 1}
-                strokeOpacity={live ? 1 : 0.7}
-                className={live ? "live-rail" : ""}
-              />
-              {dotPositions(b.hitCount).map(([dx, dy], di) => (
-                <circle key={di} cx={SX + dx} cy={sy + dy} r="2.5" fill={color} />
-              ))}
-              {b.hitCount > 10 && (
-                <text x={SX + 22} y={sy + 4} className="lbl-tiny" fill={color}>
-                  +{b.hitCount - 10}
-                </text>
-              )}
-
-              {/* Source label */}
-              <text x={SX} y={sy + 50} textAnchor="middle" className="lbl" fill={color}>
-                {SOURCE_LABEL[b.collection] ?? b.collection} · {b.hitCount}
-              </text>
-
-              {/* Query whisper */}
-              {b.query && (
-                <text x={SX} y={sy - 46} textAnchor="middle" className="lbl-italic">
-                  &ldquo;{b.query.length > 36 ? b.query.slice(0, 35) + "…" : b.query}&rdquo;
-                </text>
-              )}
-
-              {/* Ops along right curve */}
-              {b.ops.map((op, oi) => (
-                <g key={oi} transform={`translate(${SX + 80}, ${sy - 10 + oi * 16})`}>
-                  <text className="lbl" fill={hasSynth ? color : "var(--ink-3)"}>
-                    {op.label}
-                  </text>
-                  <text y={12} className="lbl-tiny">
-                    {op.detail}
-                  </text>
-                </g>
-              ))}
+                cx={projX(p.x)}
+                cy={projY(p.y)}
+                r={r}
+                fill={color}
+                opacity={op}
+                stroke={lvl > 0 ? color : "none"}
+                strokeWidth={lvl > 0 ? 0.6 : 0}
+                strokeOpacity={lvl > 0 ? 0.9 : 0}
+              >
+                <title>{`${SOURCE_LABEL[p.source] ?? p.source} · ${p.preview}`}</title>
+              </circle>
             </g>
           )
         })}
 
-        {/* Answer node */}
-        <g>
-          <circle
-            cx={AX}
-            cy={QY}
-            r={hasSynth ? 8 : 5}
-            fill={hasSynth ? "var(--accent)" : "transparent"}
-            stroke="var(--ink)"
-            strokeWidth={hasSynth ? 0 : 1}
-            strokeDasharray={hasSynth ? "0" : "2 3"}
-          />
-          <text x={AX} y={QY + 26} textAnchor="middle" className="lbl">
-            answer
+        {/* Right-side gutter: each search phase becomes a row with its query.
+            A connector runs from the row's left edge to the phase centroid
+            in the scatter. */}
+        {(() => {
+          const phasesWithCentroid = searchPhases
+            .map((phase, i) => ({ phase, centroid: phaseCentroids[i] }))
+            .filter((x) => x.centroid !== null)
+          if (phasesWithCentroid.length === 0) return null
+
+          const GUTTER_X = SCATTER_END + 18
+          const ROW_H = Math.min(
+            38,
+            Math.max(28, (VB_H - PAD_Y * 2 - 8) / phasesWithCentroid.length),
+          )
+          const startY = PAD_Y + 8
+
+          return phasesWithCentroid.map(({ phase, centroid }, k) => {
+            const cx = projX(centroid!.x)
+            const cy = projY(centroid!.y)
+            const rowYTop = startY + k * ROW_H
+            const rowYMid = rowYTop + 6
+            const isLive_ = parsed.liveSearchOrdinal === phase.ordinal
+            const q = phase.query
+            const display = q.length > 46 ? q.slice(0, 45) + "…" : q
+            const color = SOURCE_COLOR[phase.collection] ?? "var(--mute-2)"
+            // Smoothly bend connector from the centroid up/down to the row.
+            const path = `M ${cx} ${cy} C ${(cx + GUTTER_X) / 2} ${cy}, ${GUTTER_X - 30} ${rowYMid}, ${GUTTER_X - 6} ${rowYMid}`
+            return (
+              <g key={`q-${phase.tool_use_id}`} className="fade-up">
+                <path
+                  d={path}
+                  fill="none"
+                  stroke={color}
+                  strokeOpacity={isLive_ ? 0.95 : 0.55}
+                  strokeWidth={isLive_ ? 1.2 : 0.9}
+                />
+                <circle cx={GUTTER_X - 4} cy={rowYMid} r={2.5} fill={color} />
+                <text
+                  x={GUTTER_X + 4}
+                  y={rowYTop + 4}
+                  className={`q-whisper ${isLive_ ? "live-rail" : ""}`}
+                  fill={color}
+                >
+                  #{phase.ordinal} &ldquo;{display}&rdquo;
+                </text>
+                <text
+                  x={GUTTER_X + 4}
+                  y={rowYTop + 18}
+                  className="q-meta"
+                >
+                  {SOURCE_LABEL[phase.collection] ?? phase.collection} · {phase.hit_ids.length} · {MODE_LABEL[phase.mode] ?? phase.mode}
+                </text>
+              </g>
+            )
+          })
+        })()}
+
+        {/* Source legend — wraps to additional rows when the labels don't fit
+            in a single horizontal line. */}
+        {(() => {
+          const sources = Object.entries(layout!.count_by_source).filter(([, n]) => n > 0)
+          const ROW_H = 18
+          const gap = 14
+          const startX = 12
+          const maxX = VB_W - 12
+          let cursorX = startX
+          let row = 0
+          return (
+            <g>
+              {sources.map(([src, n]) => {
+                const label = `${SOURCE_LABEL[src] ?? src} · ${n}`
+                const itemWidth = 8 + label.length * 6.2 + gap
+                if (cursorX + itemWidth > maxX) {
+                  cursorX = startX
+                  row++
+                }
+                const x = cursorX
+                const y = 16 + row * ROW_H
+                cursorX += itemWidth
+                return (
+                  <g key={src}>
+                    <circle cx={x} cy={y} r="3.5" fill={SOURCE_COLOR[src]} />
+                    <text
+                      x={x + 8}
+                      y={y + 4}
+                      className="src-label"
+                      fill={SOURCE_COLOR[src]}
+                    >
+                      {label}
+                    </text>
+                  </g>
+                )
+              })}
+            </g>
+          )
+        })()}
+
+        {/* Status footer text — anchored under the scatter region. */}
+        <g transform={`translate(${SCATTER_END / 2}, ${VB_H - 12})`}>
+          <text textAnchor="middle" className="footer">
+            {parsed.hasAnswer
+              ? `${parsed.cited.length} cited · ${searchPhases.length} ${searchPhases.length === 1 ? "search" : "searches"}`
+              : isLive
+                ? searchPhases.length === 0
+                  ? "the agent is choosing where to look…"
+                  : `searching · ${searchPhases.length} so far`
+                : "—"}
           </text>
-          {parsed.synthesize && (
-            <text x={AX} y={QY + 42} textAnchor="middle" className="lbl-italic">
-              {parsed.synthesize.citations} cited
-            </text>
-          )}
         </g>
       </svg>
 
       <style jsx>{`
-        .map {
-          margin: 0;
+        .vfield {
+          margin: 0 -180px 0 0;
           padding: 8px 0;
-          width: 100%;
+          width: calc(100% + 180px);
+          max-width: calc(100% + 180px);
         }
-        .map svg {
+        .vfield svg {
           width: 100%;
           height: auto;
-          max-height: 420px;
+          max-height: 520px;
           display: block;
           font-family: var(--font-sans);
         }
+        @media (max-width: 1280px) {
+          .vfield {
+            margin-right: 0;
+            width: 100%;
+            max-width: 100%;
+          }
+        }
       `}</style>
       <style jsx global>{`
-        .map .lbl {
+        .vfield .q-whisper {
+          font-family: var(--font-serif);
+          font-style: italic;
+          font-size: 13px;
+          font-weight: 500;
+          letter-spacing: 0.005em;
+        }
+        .vfield .q-meta {
           font-family: var(--font-sans);
           font-size: 11px;
           fill: var(--ink-3);
+          letter-spacing: 0.005em;
+        }
+        .vfield .src-label {
+          font-family: var(--font-sans);
+          font-size: 11px;
+          letter-spacing: 0.005em;
+        }
+        .vfield .footer {
+          font-family: var(--font-serif);
+          font-style: italic;
+          font-size: 13px;
+          fill: var(--ink-3);
           letter-spacing: 0.01em;
         }
-        .map .lbl-italic {
-          font-family: var(--font-serif);
-          font-style: italic;
-          font-size: 12px;
-          fill: var(--mute);
+        @keyframes vec-pulse-anim {
+          0%, 100% { opacity: 0.32; }
+          50% { opacity: 0.6; }
         }
-        .map .lbl-italic-lg {
-          font-family: var(--font-serif);
-          font-style: italic;
-          font-size: 16px;
-          fill: var(--mute);
-        }
-        .map .lbl-tiny {
-          font-family: var(--font-sans);
-          font-size: 10px;
-          fill: var(--mute-2);
-          letter-spacing: 0.02em;
+        .vfield .vec-pulse { animation: vec-pulse-anim 1.8s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) {
+          .vfield .vec-pulse { animation: none; }
         }
       `}</style>
     </figure>
+  )
+}
+
+// ─── Classify chip — surfaces R1's category prediction ─────────────────────
+
+const CATEGORY_LABEL: Record<string, string> = {
+  recall: "Recall",
+  preference: "Preference",
+  opinion: "Opinion",
+  decision: "Decision",
+  voice: "Voice",
+  prediction: "Prediction",
+}
+
+function ClassifyChip({ events }: { events: TraceEvent[] }) {
+  const classify = events.find((e) => e.type === "classify") as
+    | Extract<TraceEvent, { type: "classify" }>
+    | undefined
+  if (!classify) return null
+  const label = CATEGORY_LABEL[classify.strategy] ?? classify.strategy
+  return (
+    <div className="classify fade-up">
+      <span className="classify-key serif italic">classified as</span>
+      <span className="classify-val">{label}</span>
+      {classify.reasoning && (
+        <span className="classify-why serif italic">— {classify.reasoning}</span>
+      )}
+      <style jsx>{`
+        .classify {
+          display: flex;
+          align-items: baseline;
+          gap: 8px;
+          font-size: 12px;
+          color: var(--ink-3);
+          padding: 4px 0 0;
+          flex-wrap: wrap;
+        }
+        .classify-key { color: var(--mute); font-size: 12px; }
+        .classify-val {
+          color: var(--accent);
+          font-family: var(--font-serif);
+          font-style: italic;
+          font-weight: 500;
+          font-size: 13px;
+          letter-spacing: 0.005em;
+        }
+        .classify-why {
+          color: var(--ink-3);
+          font-size: 12px;
+          flex: 1;
+          min-width: 0;
+        }
+      `}</style>
+    </div>
+  )
+}
+
+// ─── Candidate bars — score-ranked top-K from latest hit-producing tool ────
+
+function CandidateBars({ events }: { events: TraceEvent[] }) {
+  const latest = useMemo(() => {
+    for (let i = events.length - 1; i >= 0; i--) {
+      const e = events[i]
+      if (
+        e.type === "tool_result" &&
+        e.candidates &&
+        e.candidates.length > 0 &&
+        e.tool !== "summarize_for_answer"
+      ) {
+        return e as Extract<TraceEvent, { type: "tool_result" }>
+      }
+    }
+    return undefined
+  }, [events])
+
+  if (!latest || !latest.candidates) return null
+  const cands = latest.candidates.slice(0, 8)
+  const scores = cands.map((c) => c.score)
+  const maxScore = Math.max(...scores)
+  const minScore = Math.min(...scores)
+  const range = Math.max(maxScore - minScore, 1e-6)
+
+  return (
+    <section className="cands fade-up">
+      <div className="cands-head serif italic">
+        — top candidates · <span className="cands-tool">{latest.tool}</span>
+        {" "}
+        <span className="cands-count">({cands.length})</span>
+      </div>
+      <ul className="cand-list">
+        {cands.map((c) => {
+          const norm = (c.score - minScore) / range
+          const pct = Math.max(8, Math.round(norm * 100))
+          const color = SOURCE_COLOR[c.source ?? ""] ?? "var(--mute)"
+          const srcLabel = SOURCE_LABEL[c.source ?? ""] ?? c.source ?? "?"
+          return (
+            <li key={c.id} className="cand-row">
+              <span className="cand-src" style={{ color }}>
+                {srcLabel}
+              </span>
+              <span className="cand-score tnum">{c.score.toFixed(2)}</span>
+              <div className="cand-bar-wrap">
+                <div
+                  className="cand-bar"
+                  style={{ width: `${pct}%`, background: color }}
+                />
+              </div>
+              <span className="cand-preview" title={c.text_preview}>
+                {c.text_preview}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+      <style jsx>{`
+        .cands {
+          padding: 8px 0 4px;
+          margin-top: -8px;
+        }
+        .cands-head {
+          font-size: 12px;
+          color: var(--mute);
+          letter-spacing: 0.02em;
+          margin-bottom: 8px;
+        }
+        .cands-tool {
+          color: var(--ink-2);
+          font-style: italic;
+          font-family: var(--font-serif);
+        }
+        .cands-count {
+          color: var(--mute);
+          font-style: normal;
+        }
+        .cand-list {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+        }
+        .cand-row {
+          display: grid;
+          grid-template-columns: 70px 44px 90px 1fr;
+          gap: 10px;
+          align-items: center;
+          font-size: 12px;
+          line-height: 1.3;
+        }
+        .cand-src {
+          font-family: var(--font-sans);
+          font-size: 12px;
+          letter-spacing: 0.005em;
+        }
+        .cand-score {
+          font-family: var(--font-sans);
+          font-variant-numeric: tabular-nums;
+          font-size: 12px;
+          color: var(--ink-2);
+          text-align: right;
+        }
+        .cand-bar-wrap {
+          height: 6px;
+          background: var(--rule-soft, rgba(255,255,255,0.06));
+          border-radius: 1px;
+          overflow: hidden;
+        }
+        .cand-bar {
+          height: 100%;
+          opacity: 0.7;
+          transition: width 200ms ease;
+        }
+        .cand-preview {
+          color: var(--ink-3);
+          font-size: 12px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        @media (max-width: 720px) {
+          .cand-row {
+            grid-template-columns: 60px 40px 1fr;
+          }
+          .cand-preview { display: none; }
+        }
+      `}</style>
+    </section>
   )
 }

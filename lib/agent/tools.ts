@@ -1,12 +1,13 @@
 import { SOURCES, type SourceName } from "../db"
 import { search } from "../atlas-search"
+import { llmRerank } from "../rerank"
 import type { SearchHit, ToolName } from "../schemas"
 
 export const TOOL_DEFS = [
   {
     name: "search",
     description:
-      "Search one source collection. Use vector for semantic intent, text for exact phrases or names, hybrid when in doubt. Call this first. Call again with refined queries if first results are weak. Different sources reveal different aspects (Gmail = explicit statements, Slack = casual reactions, Calendar = time/place context, Notion = structured notes, GitHub = work patterns, Maps = location/recency, Photos = scenes/people).",
+      "Search one source collection. Use vector for semantic intent, text for exact phrases or names, hybrid when in doubt. Call this first. Call again with refined queries if first results are weak. Different sources reveal different aspects (Gmail = explicit statements, Slack = casual reactions, Calendar = time/place context, Notion = structured notes, GitHub = work patterns/code activity, Drive/Docs/Sheets = saved files and longer-form writing, LinkedIn = professional identity, YouTube = subscriptions and playlists revealing taste, Discord = communities the user belongs to, Maps = location/recency, Photos = scenes/people).",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -30,6 +31,12 @@ export const TOOL_DEFS = [
           description:
             "vector = semantic similarity, text = lexical match, hybrid = both with rank fusion. Default hybrid.",
         },
+        filter: {
+          type: "object",
+          description:
+            "Optional MongoDB match filter applied after retrieval. Useful keys: metadata.from, metadata.to, metadata.attendees, metadata.location, metadata.channel_name, metadata.author. Example: {\"metadata.from\": \"alice@example.com\"}. Use sparingly — only when the question implies a hard constraint.",
+          additionalProperties: true,
+        },
       },
       required: ["collection", "query"],
     },
@@ -37,7 +44,7 @@ export const TOOL_DEFS = [
   {
     name: "rerank",
     description:
-      "Reorder a list of results by a different criterion. Use after search when the user is asking about a temporal pattern (recency), about emotional content (sentiment), or about authorship (authorship).",
+      "Reorder a list of results by a different criterion. Use after search when the user is asking about a temporal pattern (recency), about emotional content (sentiment), or about authorship (authorship). For 'relevance', pass the most specific phrasing of the question as `query` — a small LLM cross-encoder will re-score every candidate against it.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -49,6 +56,11 @@ export const TOOL_DEFS = [
         criterion: {
           type: "string",
           enum: ["recency", "relevance", "sentiment_negative", "sentiment_positive", "authorship_user"],
+        },
+        query: {
+          type: "string",
+          description:
+            "Required when criterion='relevance'. The most specific phrasing of what the user actually wants — used as the reranker's reference point.",
         },
       },
       required: ["result_ids", "criterion"],
@@ -142,6 +154,7 @@ export interface ToolDispatchResult {
   summary: string
   raw: unknown
   hits?: SearchHit[]
+  hit_ids?: string[]
 }
 
 export async function dispatchTool(
@@ -154,7 +167,8 @@ export async function dispatchTool(
       const query = args.query as string
       const k = (args.k as number | undefined) ?? 8
       const mode = (args.mode as "vector" | "text" | "hybrid" | undefined) ?? "hybrid"
-      const hits = await search({ source: collection, query, k, mode })
+      const filter = args.filter as Record<string, unknown> | undefined
+      const hits = await search({ source: collection, query, k, mode, filter })
       rememberHits(hits)
       const summary =
         hits.length === 0
@@ -163,21 +177,32 @@ export async function dispatchTool(
               .slice(0, 3)
               .map((h) => `[id=${h._id}] ${truncate(h.text, 80)} (score=${h.score.toFixed(3)})`)
               .join(" · ")}`
-      return { summary, raw: hits, hits }
+      return { summary, raw: hits, hits, hit_ids: hits.map((h) => h._id) }
     }
     case "rerank": {
       const ids = args.result_ids as string[]
       const criterion = args.criterion as string
+      const query = args.query as string | undefined
       const items = recallHits(ids)
-      const reordered = rerankHits(items, criterion)
+      let reordered: SearchHit[]
+      let kindLabel = criterion
+      if (criterion === "relevance" && query && items.length > 1) {
+        const reranked = await llmRerank(query, items)
+        reordered = reranked.map((h) => ({ ...h, score: h.rerank_score ?? h.score }))
+        kindLabel = "relevance (LLM cross-encoder)"
+      } else {
+        reordered = rerankHits(items, criterion)
+      }
       const summary =
         reordered.length === 0
           ? `Reranked 0 items by ${criterion} — none of the supplied result_ids were in cache. Run search again first.`
-          : `Reranked ${reordered.length} items by ${criterion}. New order: ${reordered
+          : `Reranked ${reordered.length} items by ${kindLabel}. New order: ${reordered
               .slice(0, 5)
-              .map((h) => `[id=${h._id}]`)
+              .map((h) => `[id=${h._id}] score=${h.score.toFixed(2)}`)
               .join(", ")}`
-      return { summary, raw: reordered.map((h) => h._id), hits: reordered }
+      // Refresh cache so subsequent recallHits() sees the rerank score on `h.score`.
+      rememberHits(reordered)
+      return { summary, raw: reordered.map((h) => h._id), hits: reordered, hit_ids: reordered.map((h) => h._id) }
     }
     case "rechunk": {
       const docId = args.doc_id as string
@@ -200,7 +225,7 @@ export async function dispatchTool(
               .slice(0, 3)
               .map((h) => `[id=${h._id}]`)
               .join(", ")}`
-      return { summary, raw: matched.map((h) => h._id), hits: matched }
+      return { summary, raw: matched.map((h) => h._id), hits: matched, hit_ids: matched.map((h) => h._id) }
     }
     case "summarize_for_answer": {
       const ids = args.result_ids as string[]
@@ -208,6 +233,7 @@ export async function dispatchTool(
       return {
         summary: `FINAL: ${truncate(answer, 120)} (${ids.length} citations)`,
         raw: { answer, citation_ids: ids, citations: recallHits(ids) },
+        hit_ids: ids,
       }
     }
   }

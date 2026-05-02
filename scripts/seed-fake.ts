@@ -1,7 +1,7 @@
 import { ingest, type RawItem } from "./ingest"
 import { closeDb, type SourceName } from "../lib/db"
 
-const FAKE_DATA: Record<SourceName, RawItem[]> = {
+const FAKE_DATA: Partial<Record<SourceName, RawItem[]>> = {
   gmail_msgs: [
     {
       external_id: "gm-001",

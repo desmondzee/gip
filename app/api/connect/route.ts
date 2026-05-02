@@ -9,6 +9,15 @@ const TOOLKIT_MAP: Record<string, string> = {
   gmail_msgs: "gmail",
   calendar_events: "googlecalendar",
   slack_msgs: "slack",
+  notion_docs: "notion",
+  github_activity: "github",
+  gdrive_files: "googledrive",
+  gdocs_pages: "googledocs",
+  gsheets_sheets: "googlesheets",
+  linkedin_profile: "linkedin",
+  youtube_activity: "youtube",
+  discord_servers: "discord",
+  instagram_posts: "instagram",
 }
 
 let _composio: Composio | null = null

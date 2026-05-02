@@ -1,26 +1,24 @@
-import { ingest, ingestGmailViaComposio, ingestCalendarViaComposio, ingestSlackViaComposio } from "@/scripts/ingest"
-import type { SourceName } from "@/lib/db"
+import { ingest, getFetcher } from "@/scripts/ingest"
+import { SOURCES, type SourceName } from "@/lib/db"
+import { invalidateLayoutCache } from "@/app/api/persona/layout/route"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-const FETCHERS: Record<string, () => Promise<any[]>> = {
-  gmail_msgs: ingestGmailViaComposio,
-  calendar_events: ingestCalendarViaComposio,
-  slack_msgs: ingestSlackViaComposio,
-}
-
 export async function POST(req: Request) {
   const { source } = (await req.json()) as { source: string }
 
-  const fetcher = FETCHERS[source]
-  if (!fetcher) {
+  if (!SOURCES.includes(source as SourceName)) {
     return Response.json({ error: `unknown source: ${source}` }, { status: 400 })
   }
+  const fetcher = getFetcher(source as SourceName)
 
   try {
     const items = await fetcher()
     const result = await ingest(source as SourceName, items)
+    if ((result.inserted ?? 0) > 0 || (result.updated ?? 0) > 0) {
+      invalidateLayoutCache()
+    }
     return Response.json({ source, ...result })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

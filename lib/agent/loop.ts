@@ -1,7 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { TOOL_DEFS, dispatchTool } from "./tools"
 import { systemPrompt } from "./prompts"
-import type { SearchHit, ToolName, TraceEvent } from "../schemas"
+import { classifyQuestion } from "./classify"
+import type { CandidateScore, SearchHit, ToolName, TraceEvent } from "../schemas"
 
 const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6"
 const DEFAULT_USER_NAME = process.env.PERSONA_USER_NAME ?? "the user"
@@ -48,6 +49,15 @@ export async function runAgent(
   let errorMsg: string | undefined
 
   try {
+    const classification = await classifyQuestion(question)
+    emit({
+      type: "classify",
+      strategy: classification.category,
+      reasoning: classification.reasoning,
+      t: Date.now() - start,
+    })
+    const sysPrompt = systemPrompt(userName, classification.category)
+
     for (let turn = 0; turn < maxTurns; turn++) {
       if (Date.now() - start > HARD_TIMEOUT_MS) {
         status = "timeout"
@@ -57,7 +67,7 @@ export async function runAgent(
       const response = await client().messages.create({
         model: MODEL,
         max_tokens: 1024,
-        system: systemPrompt(userName),
+        system: sysPrompt,
         tools: TOOL_DEFS as unknown as Anthropic.Messages.Tool[],
         messages,
       })
@@ -126,6 +136,15 @@ export async function runAgent(
           continue
         }
 
+        const candidates: CandidateScore[] | undefined = result.hits?.map((h) => ({
+          id: h._id,
+          score: h.score,
+          match_kind: h.match_kind,
+          ts: h.ts,
+          source: h.source,
+          text_preview: h.text.slice(0, 80),
+        }))
+
         emit({
           type: "tool_result",
           tool_use_id: tu.id,
@@ -133,6 +152,8 @@ export async function runAgent(
           result_summary: result.summary,
           latency_ms: Date.now() - tCallStart,
           t: Date.now() - start,
+          hit_ids: result.hit_ids,
+          candidates,
         })
 
         toolResults.push({
