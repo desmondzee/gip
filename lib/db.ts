@@ -19,6 +19,14 @@ export const SOURCES = [
   "instagram_posts",
   "maps_history",
   "photos_meta",
+  "sheets_data",
+  "outlook_msgs",
+  "drive_files",
+  "docs_content",
+  "youtube_history",
+  "discord_msgs",
+  "linkedin_activity",
+  "instagram_posts",
 ] as const
 
 export type SourceName = (typeof SOURCES)[number]

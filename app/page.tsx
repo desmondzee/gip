@@ -14,6 +14,7 @@ type CardState = {
   error_message?: string
 }
 
+<<<<<<< Updated upstream
 function normalize(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim()
 }
@@ -34,18 +35,30 @@ function formatSeconds(ms?: number): string {
   return `${(ms / 1000).toFixed(1)}s`
 }
 
+=======
+>>>>>>> Stashed changes
 const SOURCES = [
   "gmail_msgs",
   "calendar_events",
   "slack_msgs",
   "notion_docs",
   "github_activity",
+<<<<<<< Updated upstream
   "gdrive_files",
   "gdocs_pages",
   "gsheets_sheets",
   "linkedin_profile",
   "youtube_activity",
   "discord_servers",
+=======
+  "sheets_data",
+  "outlook_msgs",
+  "drive_files",
+  "docs_content",
+  "youtube_history",
+  "discord_msgs",
+  "linkedin_activity",
+>>>>>>> Stashed changes
   "instagram_posts",
 ] as const
 type IngestSource = (typeof SOURCES)[number]

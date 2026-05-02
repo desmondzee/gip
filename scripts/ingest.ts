@@ -223,6 +223,7 @@ export async function ingestSlackViaComposio(): Promise<RawItem[]> {
   return items
 }
 
+<<<<<<< Updated upstream
 export async function ingestNotionViaComposio(): Promise<RawItem[]> {
   const { client, userId } = getComposio()
 
@@ -716,11 +717,308 @@ export async function ingestDiscordViaComposio(): Promise<RawItem[]> {
     }
   } catch (err) {
     console.warn(`  [discord] self failed: ${err}`)
+=======
+// ---------------------------------------------------------------------------
+// GitHub
+// ---------------------------------------------------------------------------
+
+export async function ingestGithubViaComposio(): Promise<RawItem[]> {
+  const { client, userId } = getComposio()
+
+  const result: any = await client.tools.execute("GITHUB_LIST_EVENTS_FOR_THE_AUTHENTICATED_USER", {
+    userId,
+    arguments: {
+      per_page: 100,
+    },
+  })
+
+  const events: any[] = result?.data ?? result?.items ?? result ?? []
+
+  return events.map((evt: any) => ({
+    external_id: `github_${evt.id}`,
+    ts: new Date(evt.created_at ?? Date.now()),
+    text: [evt.type, evt.repo?.name, JSON.stringify(evt.payload ?? {})].filter(Boolean).join(" — "),
+    metadata: {
+      type: evt.type ?? null,
+      repo: evt.repo?.name ?? null,
+      actor: evt.actor?.login ?? null,
+    },
+  }))
+}
+
+// ---------------------------------------------------------------------------
+// Notion
+// ---------------------------------------------------------------------------
+
+export async function ingestNotionViaComposio(): Promise<RawItem[]> {
+  const { client, userId } = getComposio()
+
+  const result: any = await client.tools.execute("NOTION_SEARCH_NOTION_PAGES", {
+    userId,
+    arguments: {
+      query: "",
+      page_size: 100,
+    },
+  })
+
+  const pages: any[] = result?.data?.results ?? result?.results ?? []
+
+  return pages.map((page: any) => {
+    const title =
+      page.properties?.title?.title?.[0]?.plain_text ??
+      page.properties?.Name?.title?.[0]?.plain_text ??
+      page.id
+    return {
+      external_id: `notion_${page.id}`,
+      ts: new Date(page.last_edited_time ?? page.created_time ?? Date.now()),
+      text: title,
+      metadata: {
+        url: page.url ?? null,
+        created_time: page.created_time ?? null,
+        last_edited_time: page.last_edited_time ?? null,
+        object: page.object ?? null,
+      },
+    }
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Google Sheets
+// ---------------------------------------------------------------------------
+
+export async function ingestSheetsViaComposio(): Promise<RawItem[]> {
+  const { client, userId } = getComposio()
+
+  // List spreadsheet files via Drive
+  const filesRes: any = await client.tools.execute("GOOGLEDRIVE_SEARCH_FILES", {
+    userId,
+    arguments: {
+      query: "mimeType='application/vnd.google-apps.spreadsheet'",
+      page_size: 50,
+    },
+  })
+
+  const files: any[] = filesRes?.data?.files ?? filesRes?.files ?? []
+  const items: RawItem[] = []
+
+  for (const file of files.slice(0, 20)) {
+    try {
+      const sheetRes: any = await client.tools.execute("GOOGLESHEETS_BATCH_GET", {
+        userId,
+        arguments: {
+          spreadsheet_id: file.id,
+          ranges: ["A1:Z100"],
+        },
+      })
+      const values: any[][] = sheetRes?.data?.valueRanges?.[0]?.values ?? []
+      if (values.length === 0) continue
+      const text = values.map((row: any[]) => row.join("\t")).join("\n")
+      items.push({
+        external_id: `sheets_${file.id}`,
+        ts: new Date(file.modifiedTime ?? Date.now()),
+        text: `${file.name}\n\n${text}`.slice(0, 8000),
+        metadata: { file_id: file.id, name: file.name ?? null },
+      })
+    } catch (err) {
+      console.warn(`[sheets] skipped ${file.name ?? file.id}: ${err}`)
+    }
   }
 
   return items
 }
 
+// ---------------------------------------------------------------------------
+// Outlook
+// ---------------------------------------------------------------------------
+
+export async function ingestOutlookViaComposio(): Promise<RawItem[]> {
+  const { client, userId } = getComposio()
+
+  const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+
+  const result: any = await client.tools.execute("OUTLOOK_LIST_MESSAGES", {
+    userId,
+    arguments: {
+      folder: "inbox",
+      top: 200,
+      filter: `receivedDateTime ge ${cutoff}`,
+    },
+  })
+
+  const messages: any[] = result?.data?.value ?? result?.value ?? result?.messages ?? []
+
+  return messages.map((msg: any) => ({
+    external_id: `outlook_${msg.id}`,
+    ts: new Date(msg.receivedDateTime ?? msg.sentDateTime ?? Date.now()),
+    text: [msg.subject, msg.bodyPreview ?? msg.body?.content].filter(Boolean).join("\n\n"),
+    metadata: {
+      from: msg.from?.emailAddress?.address ?? null,
+      subject: msg.subject ?? null,
+      preview: msg.bodyPreview ?? null,
+      importance: msg.importance ?? null,
+      has_attachments: msg.hasAttachments ?? false,
+    },
+  }))
+}
+
+// ---------------------------------------------------------------------------
+// Google Drive
+// ---------------------------------------------------------------------------
+
+export async function ingestDriveViaComposio(): Promise<RawItem[]> {
+  const { client, userId } = getComposio()
+
+  const result: any = await client.tools.execute("GOOGLEDRIVE_LIST_FILES", {
+    userId,
+    arguments: {
+      page_size: 200,
+      order_by: "modifiedTime desc",
+    },
+  })
+
+  const files: any[] = result?.data?.files ?? result?.files ?? []
+
+  return files.map((file: any) => ({
+    external_id: `drive_${file.id}`,
+    ts: new Date(file.modifiedTime ?? file.createdTime ?? Date.now()),
+    text: [file.name, file.description].filter(Boolean).join(" — "),
+    metadata: {
+      name: file.name ?? null,
+      mime_type: file.mimeType ?? null,
+      web_view_link: file.webViewLink ?? null,
+      owners: (file.owners ?? []).map((o: any) => o.emailAddress),
+      modified_time: file.modifiedTime ?? null,
+    },
+  }))
+}
+
+// ---------------------------------------------------------------------------
+// Google Docs
+// ---------------------------------------------------------------------------
+
+export async function ingestDocsViaComposio(): Promise<RawItem[]> {
+  const { client, userId } = getComposio()
+
+  // List Google Docs files via Drive
+  const filesRes: any = await client.tools.execute("GOOGLEDRIVE_SEARCH_FILES", {
+    userId,
+    arguments: {
+      query: "mimeType='application/vnd.google-apps.document'",
+      page_size: 50,
+    },
+  })
+
+  const files: any[] = filesRes?.data?.files ?? filesRes?.files ?? []
+  const items: RawItem[] = []
+
+  for (const file of files.slice(0, 30)) {
+    try {
+      const docRes: any = await client.tools.execute("GOOGLEDOCS_GET_DOCUMENT_BY_ID", {
+        userId,
+        arguments: { document_id: file.id },
+      })
+      const doc = docRes?.data ?? docRes
+      const body = doc?.body?.content ?? []
+      const text = body
+        .flatMap((el: any) => el?.paragraph?.elements ?? [])
+        .map((el: any) => el?.textRun?.content ?? "")
+        .join("")
+        .trim()
+      if (!text) continue
+      items.push({
+        external_id: `docs_${file.id}`,
+        ts: new Date(file.modifiedTime ?? Date.now()),
+        text: `${file.name}\n\n${text}`.slice(0, 8000),
+        metadata: { document_id: file.id, name: file.name ?? null, title: doc?.title ?? null },
+      })
+    } catch (err) {
+      console.warn(`[docs] skipped ${file.name ?? file.id}: ${err}`)
+    }
+  }
+
+  return items
+}
+
+// ---------------------------------------------------------------------------
+// YouTube
+// ---------------------------------------------------------------------------
+
+export async function ingestYoutubeViaComposio(): Promise<RawItem[]> {
+  const { client, userId } = getComposio()
+
+  const result: any = await client.tools.execute("YOUTUBE_GET_CHANNEL_ACTIVITIES", {
+    userId,
+    arguments: {
+      part: "snippet,contentDetails",
+      mine: true,
+      max_results: 200,
+    },
+  })
+
+  const items_raw: any[] = result?.data?.items ?? result?.items ?? []
+
+  return items_raw.map((item: any) => ({
+    external_id: `youtube_${item.id}`,
+    ts: new Date(item.snippet?.publishedAt ?? Date.now()),
+    text: [item.snippet?.title, item.snippet?.description].filter(Boolean).join("\n\n"),
+    metadata: {
+      type: item.snippet?.type ?? null,
+      channel_id: item.snippet?.channelId ?? null,
+      video_id: item.contentDetails?.upload?.videoId ?? null,
+      title: item.snippet?.title ?? null,
+    },
+  }))
+}
+
+// ---------------------------------------------------------------------------
+// Discord  (limited Composio scopes — fetches profile + guild memberships)
+// ---------------------------------------------------------------------------
+
+export async function ingestDiscordViaComposio(): Promise<RawItem[]> {
+  const { client, userId } = getComposio()
+
+  const userRes: any = await client.tools.execute("DISCORD_GET_MY_USER", {
+    userId,
+    arguments: {},
+  })
+
+  const user = userRes?.data ?? userRes
+  if (!user?.id) return []
+
+  const guildsRes: any = await client.tools.execute("DISCORD_LIST_USER_GUILDS", {
+    userId,
+    arguments: {},
+  }).catch(() => ({ data: [] }))
+
+  const guilds: any[] = guildsRes?.data ?? []
+  const items: RawItem[] = []
+
+  items.push({
+    external_id: `discord_user_${user.id}`,
+    ts: new Date(),
+    text: `Discord user: ${user.username}${user.discriminator ? "#" + user.discriminator : ""}`,
+    metadata: {
+      user_id: user.id,
+      username: user.username ?? null,
+      discriminator: user.discriminator ?? null,
+      global_name: user.global_name ?? null,
+    },
+  })
+
+  for (const guild of guilds) {
+    items.push({
+      external_id: `discord_guild_${guild.id}`,
+      ts: new Date(),
+      text: `Discord server: ${guild.name}`,
+      metadata: { guild_id: guild.id, guild_name: guild.name ?? null },
+    })
+>>>>>>> Stashed changes
+  }
+
+  return items
+}
+
+<<<<<<< Updated upstream
 export async function ingestInstagramViaComposio(): Promise<RawItem[]> {
   const { client, userId } = getComposio()
   const items: RawItem[] = []
@@ -815,11 +1113,121 @@ export async function ingestInstagramViaComposio(): Promise<RawItem[]> {
       console.warn(`  [instagram] media page failed: ${err}`)
       break
     }
+=======
+// ---------------------------------------------------------------------------
+// LinkedIn
+// ---------------------------------------------------------------------------
+
+export async function ingestLinkedinViaComposio(): Promise<RawItem[]> {
+  const { client, userId } = getComposio()
+
+  const profileRes: any = await client.tools.execute("LINKEDIN_GET_MY_INFO", {
+    userId,
+    arguments: {},
+  })
+
+  const profile = profileRes?.data ?? profileRes
+  const items: RawItem[] = []
+
+  if (profile) {
+    const name = [
+      profile.firstName?.localized?.en_US ?? profile.firstName,
+      profile.lastName?.localized?.en_US ?? profile.lastName,
+    ]
+      .filter(Boolean)
+      .join(" ")
+    items.push({
+      external_id: `linkedin_profile_${profile.id ?? "me"}`,
+      ts: new Date(),
+      text: `LinkedIn profile: ${name || "me"}\n${profile.headline ?? ""}`,
+      metadata: {
+        linkedin_id: profile.id ?? null,
+        name,
+        headline: profile.headline ?? null,
+        industry: profile.industry ?? null,
+      },
+    })
+  }
+
+  // Fetch recent posts
+  const postsRes: any = await client.tools.execute("LINKEDIN_GET_POST_CONTENT", {
+    userId,
+    arguments: { author: `urn:li:person:${profile?.id ?? "me"}` },
+  }).catch(() => ({ data: [] }))
+
+  const posts: any[] = postsRes?.data?.elements ?? postsRes?.elements ?? []
+  for (const post of posts) {
+    const text = post.commentary ?? post.specificContent?.["com.linkedin.ugc.ShareContent"]?.shareCommentary?.text ?? ""
+    if (!text) continue
+    items.push({
+      external_id: `linkedin_post_${post.id}`,
+      ts: new Date(post.firstPublishedAt ?? post.created?.time ?? Date.now()),
+      text,
+      metadata: { post_id: post.id ?? null, lifecycle_state: post.lifecycleState ?? null },
+    })
   }
 
   return items
 }
 
+// ---------------------------------------------------------------------------
+// Instagram  (Business / Creator accounts only)
+// ---------------------------------------------------------------------------
+
+export async function ingestInstagramViaComposio(): Promise<RawItem[]> {
+  const { client, userId } = getComposio()
+
+  const mediaRes: any = await client.tools.execute("INSTAGRAM_GET_IG_USER_MEDIA", {
+    userId,
+    arguments: {
+      fields: "id,caption,media_type,media_url,thumbnail_url,timestamp,permalink",
+      limit: 200,
+    },
+  })
+
+  const posts: any[] = mediaRes?.data?.data ?? mediaRes?.data ?? mediaRes?.items ?? []
+  const items: RawItem[] = []
+
+  for (const post of posts) {
+    items.push({
+      external_id: `instagram_${post.id}`,
+      ts: new Date(post.timestamp ?? Date.now()),
+      text: post.caption ?? `Instagram ${post.media_type ?? "post"}: ${post.id}`,
+      metadata: {
+        media_type: post.media_type ?? null,
+        media_url: post.media_url ?? null,
+        permalink: post.permalink ?? null,
+        thumbnail_url: post.thumbnail_url ?? null,
+      },
+    })
+  }
+
+  // Also fetch stories if available
+  const storiesRes: any = await client.tools.execute("INSTAGRAM_GET_IG_USER_STORIES", {
+    userId,
+    arguments: {
+      fields: "id,caption,media_type,media_url,timestamp",
+    },
+  }).catch(() => ({ data: [] }))
+
+  const stories: any[] = storiesRes?.data?.data ?? storiesRes?.data ?? []
+  for (const story of stories) {
+    items.push({
+      external_id: `instagram_story_${story.id}`,
+      ts: new Date(story.timestamp ?? Date.now()),
+      text: story.caption ?? `Instagram story: ${story.id}`,
+      metadata: {
+        media_type: story.media_type ?? null,
+        media_url: story.media_url ?? null,
+      },
+    })
+>>>>>>> Stashed changes
+  }
+
+  return items
+}
+
+<<<<<<< Updated upstream
 const FETCHERS: Record<SourceName, () => Promise<RawItem[]>> = {
   gmail_msgs: ingestGmailViaComposio,
   calendar_events: ingestCalendarViaComposio,
@@ -874,6 +1282,63 @@ async function main() {
     } catch (err) {
       console.error(`[${source}] failed: ${err instanceof Error ? err.message : err}`)
     }
+=======
+async function main() {
+  const arg = process.argv[2]
+  if (!arg) {
+    console.error("Usage: bun scripts/ingest.ts <source>")
+    console.error(
+      `Sources: gmail_msgs, calendar_events, slack_msgs, notion_docs, github_activity, ` +
+        `sheets_data, outlook_msgs, drive_files, docs_content, youtube_history, discord_msgs, linkedin_activity`
+    )
+    process.exit(1)
+  }
+
+  let items: RawItem[] = []
+  switch (arg) {
+    case "gmail_msgs":
+      items = await ingestGmailViaComposio()
+      break
+    case "calendar_events":
+      items = await ingestCalendarViaComposio()
+      break
+    case "slack_msgs":
+      items = await ingestSlackViaComposio()
+      break
+    case "github_activity":
+      items = await ingestGithubViaComposio()
+      break
+    case "notion_docs":
+      items = await ingestNotionViaComposio()
+      break
+    case "sheets_data":
+      items = await ingestSheetsViaComposio()
+      break
+    case "outlook_msgs":
+      items = await ingestOutlookViaComposio()
+      break
+    case "drive_files":
+      items = await ingestDriveViaComposio()
+      break
+    case "docs_content":
+      items = await ingestDocsViaComposio()
+      break
+    case "youtube_history":
+      items = await ingestYoutubeViaComposio()
+      break
+    case "discord_msgs":
+      items = await ingestDiscordViaComposio()
+      break
+    case "linkedin_activity":
+      items = await ingestLinkedinViaComposio()
+      break
+    case "instagram_posts":
+      items = await ingestInstagramViaComposio()
+      break
+    default:
+      console.error(`Source ${arg} not yet wired. Add a fetcher.`)
+      process.exit(1)
+>>>>>>> Stashed changes
   }
 
   await closeDb()

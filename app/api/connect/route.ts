@@ -9,6 +9,7 @@ const TOOLKIT_MAP: Record<string, string> = {
   gmail_msgs: "gmail",
   calendar_events: "googlecalendar",
   slack_msgs: "slack",
+<<<<<<< Updated upstream
   notion_docs: "notion",
   github_activity: "github",
   gdrive_files: "googledrive",
@@ -17,6 +18,17 @@ const TOOLKIT_MAP: Record<string, string> = {
   linkedin_profile: "linkedin",
   youtube_activity: "youtube",
   discord_servers: "discord",
+=======
+  github_activity: "github",
+  notion_docs: "notion",
+  sheets_data: "googlesheets",
+  outlook_msgs: "outlook",
+  drive_files: "googledrive",
+  docs_content: "googledocs",
+  youtube_history: "youtube",
+  discord_msgs: "discord",
+  linkedin_activity: "linkedin",
+>>>>>>> Stashed changes
   instagram_posts: "instagram",
 }
 
