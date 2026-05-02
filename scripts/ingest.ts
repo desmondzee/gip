@@ -2,6 +2,7 @@ import { Composio } from "@composio/core"
 import { memoriesOf, closeDb, type SourceName } from "../lib/db"
 import { embed } from "../lib/embeddings"
 import type { Memory } from "../lib/schemas"
+import { sanitizeText } from "../lib/util/sanitize"
 
 // ---------------------------------------------------------------------------
 // Composio client (lazy singleton)
@@ -24,16 +25,6 @@ export interface RawItem {
   text: string
   metadata: Record<string, unknown>
 }
-
-function sanitizeText(s: string): string {
-  if (!s) return ""
-  return s
-    // strip lone surrogates that break downstream JSON encoders
-    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "")
-    // strip C0 controls except tab/newline/CR, plus DEL
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
-}
-
 
 export async function ingest(source: SourceName, items: RawItem[]): Promise<{ inserted: number; updated: number }> {
   if (items.length === 0) return { inserted: 0, updated: 0 }

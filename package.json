@@ -10,16 +10,20 @@
     "ingest": "bun scripts/ingest.ts",
     "seed": "bun scripts/seed-fake.ts",
     "questions": "bun scripts/run-questions.ts",
-    "ensure-indexes": "bun scripts/ensure-indexes.ts"
+    "ensure-indexes": "bun scripts/ensure-indexes.ts",
+    "mcp": "bun bin/mcp-persona.ts",
+    "smoke-mcp": "bun scripts/smoke-mcp.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",
     "@composio/core": "^0.8.1",
     "@google/generative-ai": "^0.24.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "mongodb": "^7.2.0",
     "next": "^16.2.4",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-dom": "^19.2.5",
+    "zod": "^4.4.2"
   },
   "devDependencies": {
     "@types/bun": "^1.3.13",
