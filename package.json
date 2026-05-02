@@ -1,0 +1,30 @@
+{
+  "name": "persona",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "ingest": "bun scripts/ingest.ts",
+    "seed": "bun scripts/seed-fake.ts",
+    "questions": "bun scripts/run-questions.ts",
+    "ensure-indexes": "bun scripts/ensure-indexes.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.92.0",
+    "@google/generative-ai": "^0.24.1",
+    "mongodb": "^7.2.0",
+    "next": "15.1.6",
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.13",
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^6.0.3"
+  }
+}

@@ -1,0 +1,30 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  background: #0b0b0d;
+  color: #e8e8ec;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+a { color: inherit; }
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  background: #1f1f24;
+  color: #e8e8ec;
+  border: 1px solid #2c2c33;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover { background: #2a2a30; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
