@@ -34,6 +34,11 @@ function formatSeconds(ms?: number): string {
   return `${(ms / 1000).toFixed(1)}s`
 }
 
+const SOURCES = ["gmail_msgs", "calendar_events", "slack_msgs"] as const
+type IngestSource = (typeof SOURCES)[number]
+type IngestStatus = "idle" | "running" | "done" | "error"
+type ConnectStatus = "unknown" | "checking" | "connected" | "not_connected" | "error"
+
 export default function Page() {
   const [cards, setCards] = useState<CardState[]>([])
   const [activeIdx, setActiveIdx] = useState<number | null>(null)
@@ -41,6 +46,63 @@ export default function Page() {
   const [indexOpen, setIndexOpen] = useState(false)
   const cardsRef = useRef<CardState[]>([])
   cardsRef.current = cards
+
+  const [ingestStatus, setIngestStatus] = useState<Record<IngestSource, IngestStatus>>(
+    () => Object.fromEntries(SOURCES.map((s) => [s, "idle"])) as Record<IngestSource, IngestStatus>
+  )
+  const [ingestMsg, setIngestMsg] = useState<Record<IngestSource, string>>(
+    () => Object.fromEntries(SOURCES.map((s) => [s, ""])) as Record<IngestSource, string>
+  )
+  const [connectStatus, setConnectStatus] = useState<Record<IngestSource, ConnectStatus>>(
+    () => Object.fromEntries(SOURCES.map((s) => [s, "unknown"])) as Record<IngestSource, ConnectStatus>
+  )
+  const [connectUrls, setConnectUrls] = useState<Record<IngestSource, string>>(
+    () => Object.fromEntries(SOURCES.map((s) => [s, ""])) as Record<IngestSource, string>
+  )
+
+  const checkConnection = useCallback(async (source: IngestSource) => {
+    setConnectStatus((p) => ({ ...p, [source]: "checking" }))
+    try {
+      const res = await fetch(`/api/connect?source=${source}`)
+      const data = await res.json()
+      if (!res.ok) {
+        setConnectStatus((p) => ({ ...p, [source]: "error" }))
+        return
+      }
+      if (data.status === "connected") {
+        setConnectStatus((p) => ({ ...p, [source]: "connected" }))
+      } else {
+        setConnectStatus((p) => ({ ...p, [source]: "not_connected" }))
+        setConnectUrls((p) => ({ ...p, [source]: data.redirectUrl ?? "" }))
+      }
+    } catch {
+      setConnectStatus((p) => ({ ...p, [source]: "error" }))
+    }
+  }, [])
+
+  useEffect(() => {
+    SOURCES.forEach((s) => checkConnection(s))
+  }, [checkConnection])
+
+  const runIngest = useCallback(async (source: IngestSource) => {
+    setIngestStatus((p) => ({ ...p, [source]: "running" }))
+    setIngestMsg((p) => ({ ...p, [source]: "" }))
+    try {
+      const res = await fetch("/api/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? res.statusText)
+      setIngestMsg((p) => ({ ...p, [source]: `+${data.inserted} new, ~${data.updated} updated` }))
+      setIngestStatus((p) => ({ ...p, [source]: "done" }))
+      checkConnection(source)
+    } catch (err) {
+      setIngestMsg((p) => ({ ...p, [source]: err instanceof Error ? err.message : String(err) }))
+      setIngestStatus((p) => ({ ...p, [source]: "error" }))
+    }
+  }, [checkConnection])
 
   useEffect(() => {
     fetch("/api/persona/questions")
@@ -197,6 +259,93 @@ export default function Page() {
           <span className="arrow">→</span>
         </button>
       </header>
+
+      <div
+        style={{
+          display: "flex",
+          gap: "16px",
+          flexWrap: "wrap",
+          padding: "10px 14px",
+          marginBottom: "12px",
+          border: "1px solid var(--rule)",
+          borderRadius: "2px",
+          background: "var(--bg-tint)",
+          alignItems: "center",
+        }}
+      >
+        <span className="serif italic" style={{ color: "var(--ink-3)", fontSize: "13px", marginRight: "4px" }}>
+          Sources
+        </span>
+        {SOURCES.map((src) => {
+          const cs = connectStatus[src]
+          const isConnected = cs === "connected"
+          const notConnected = cs === "not_connected"
+          const connectUrl = connectUrls[src]
+          const label = src.replace("_msgs", "").replace("_events", "")
+          const dot =
+            cs === "connected"
+              ? "var(--match)"
+              : cs === "not_connected"
+                ? "var(--differs)"
+                : cs === "checking"
+                  ? "var(--live)"
+                  : "var(--mute-2)"
+          return (
+            <div key={src} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span
+                title={cs}
+                className={cs === "checking" ? "live-rail" : ""}
+                style={{
+                  width: "7px",
+                  height: "7px",
+                  borderRadius: "50%",
+                  display: "inline-block",
+                  background: dot,
+                  flexShrink: 0,
+                }}
+              />
+              {notConnected && connectUrl ? (
+                <a
+                  href={connectUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    fontSize: "12px",
+                    color: "var(--differs)",
+                    textDecoration: "underline",
+                    textUnderlineOffset: "3px",
+                  }}
+                >
+                  connect {label} ↗
+                </a>
+              ) : (
+                <button
+                  onClick={() => runIngest(src)}
+                  disabled={ingestStatus[src] === "running" || !isConnected}
+                  style={{
+                    fontSize: "12px",
+                    color: "var(--ink-2)",
+                    textDecoration: "underline",
+                    textUnderlineOffset: "3px",
+                  }}
+                >
+                  {ingestStatus[src] === "running" ? `${label}…` : label}
+                </button>
+              )}
+              {ingestMsg[src] && (
+                <span
+                  style={{
+                    fontSize: "11px",
+                    color: ingestStatus[src] === "error" ? "var(--differs)" : "var(--match)",
+                  }}
+                >
+                  {ingestMsg[src]}
+                </span>
+              )}
+            </div>
+          )
+        })}
+      </div>
 
       <button
         className="index-toggle"
