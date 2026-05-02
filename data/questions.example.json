@@ -8,86 +8,86 @@
   {
     "id": "q02",
     "category": "recall",
-    "question": "Which hackathon did I win the $10k top prize at?",
-    "ground_truth": "ETH Oxford (hosted by HomeDAO). I posted '5 rules we used to win the $10k top prize at ETH Oxford' and 'Winning ETH Oxford hosted by HomeDAO was the goal. We did it.'"
+    "question": "Which AI framework did I drop in favor of native API calls?",
+    "ground_truth": "LangChain — I posted on Slack 'switched off the langchain agent entirely and latency dropped 40%', and the corresponding GitHub commit reads 'refactor: drop langchain in favor of native anthropic SDK'."
   },
   {
     "id": "q03",
     "category": "recall",
-    "question": "What summer program did I draft a 2026 proposal for?",
-    "ground_truth": "Google Summer of Code — there's a doc in my Drive called 'GSoC2026ProposalYuzhongLuo'."
+    "question": "Who do I tutor most often, per my calendar?",
+    "ground_truth": "Denzel — Tutoring Denzel is by far my most recurring tutoring event. Claire and Angela appear less often."
   },
   {
     "id": "q04",
     "category": "recall",
-    "question": "Do I have a GitHub repo built around Claude Code's source?",
-    "ground_truth": "Yes — pig8pig/claude-code-source-code. The description literally says 'Claude code source code'."
+    "question": "Which hackathon has Cerebral Valley been emailing me about?",
+    "ground_truth": "The Agentic Evolution Hackathon — I've gotten multiple 'New Notification for The Agentic Evolution Hackathon' emails from Cerebral Valley Events."
   },
   {
     "id": "q05",
     "category": "recall",
-    "question": "Where do I study?",
-    "ground_truth": "Oxford — Engineering at Trinity College. It's in my Instagram bio, my CV docs, and shows up in IG captions like 'POV: You walk into your Oxford Engineering lecture' and 'Oxbridge boat race vlog 2026'."
+    "question": "Who shared the MongoDB Hackathon doc with me?",
+    "ground_truth": "Jerry Jin — I got a 'Document shared with you: MongoDB Hackathon' email from him via Google Docs, and the doc itself sits in my Drive."
   },
   {
     "id": "q06",
     "category": "preference",
-    "question": "What do I post most on Instagram?",
-    "ground_truth": "Reels about hackathons (winning ETH Oxford, IC Hack 26, the UK's biggest quant hackathon) and AI commentary (Anthropic news, AI-and-jobs takes), with some Oxford student-life moments mixed in."
+    "question": "How do I feel about meetings that could've been a Slack message?",
+    "ground_truth": "Annoyed — I posted on the lab Slack: 'if i have one more 4-person standup that could've been a slack message i'm going to lose it.'"
   },
   {
     "id": "q07",
     "category": "preference",
-    "question": "Which Mandopop artist do I subscribe to most prominently on YouTube?",
-    "ground_truth": "Jay Chou (周杰倫) — direct subscription. I also follow Eric Chou (周興哲)."
+    "question": "Who's my favorite working movie director?",
+    "ground_truth": "Denis Villeneuve — I said it directly on Slack after rewatching Dune Part 2: 'denis villeneuve is now my favorite working director, it's not even close.'"
   },
   {
     "id": "q08",
     "category": "preference",
     "question": "What sport am I most invested in?",
-    "ground_truth": "Badminton — Trinity Badminton 2025-26 sign-up sheet in Drive, BWF TV and Badminton Insight on my YouTube subs, and badminton sessions on the calendar."
+    "ground_truth": "Badminton — Vector Badminton is on my calendar 15+ times, I'm in the Trinity Badminton 2025-26 sign-up sheet, and BWF TV plus Badminton Insight are on my YouTube subs."
   },
   {
     "id": "q09",
     "category": "preference",
-    "question": "What's the dominant theme across my GitHub side projects?",
-    "ground_truth": "AI and hackathon-style work — AI-Ethical-Debate-Arena (x2), neuro-cue-companion, HackEurope-NeuroSeek, Quantihack, Neurohack-2026, claude-code-source-code, trading_ai_single_asset. Almost everything is AI-flavored or hackathon-bred."
+    "question": "Which Mandopop artist do I subscribe to most prominently on YouTube?",
+    "ground_truth": "Jay Chou (周杰倫) — direct subscription. Eric Chou (周興哲) is the second pick."
   },
   {
     "id": "q10",
     "category": "preference",
-    "question": "When I plan trips, do I lean Asia or Europe?",
-    "ground_truth": "Europe — Italy 2026 expenses, Italy TimeSaver Travel Planner, and Europe Travel Planner 2025 are all in my Sheets. No Asia equivalents."
+    "question": "What's the dominant theme across my GitHub side projects?",
+    "ground_truth": "AI and hackathon work — AI-Ethical-Debate-Arena (x2), neuro-cue-companion, HackEurope-NeuroSeek, Quantihack, Neurohack-2026, claude-code-source-code, trading_ai_single_asset. Almost everything is AI-flavored or hackathon-bred."
   },
   {
     "id": "q11",
     "category": "opinion",
     "question": "Are hackathons just coding competitions, in my view?",
-    "ground_truth": "No — I've posted explicitly 'Stop treating hackathons like coding competitions.' My take: pitch, time management, and team execution decide who wins. That's how we took ETH Oxford."
+    "ground_truth": "No — I posted on Instagram 'Stop treating hackathons like coding competitions.' I think pitch, time management, and team execution decide who wins. That's how we took ETH Oxford."
   },
   {
     "id": "q12",
     "category": "opinion",
     "question": "How do I feel about AI's impact on jobs?",
-    "ground_truth": "Concerned and tracking it closely. I've posted 'Are we all cooked?', referenced Anthropic's claim that AI would write 90% of code within 6 months, and noted that 300M jobs are at risk. I treat it as a real signal, not hype."
+    "ground_truth": "Concerned and tracking it closely. My Insta has 'Are we all cooked?', references to Anthropic claiming 90% of code in 6 months, and 300M jobs at risk. Meanwhile I keep entering AI hackathons (Agentic Evolution, ElevenLabs credits) — I treat it as a real signal, not hype."
   },
   {
     "id": "q13",
     "category": "decision",
-    "question": "Should I do another hackathon next month?",
-    "ground_truth": "Yes — recent pattern is strong: ETH Oxford win ($10k), IC Hack 26, finalist at the UK's biggest quant hackathon (800 entered online). I'm clearly in a hackathon era."
+    "question": "Should I take the Jane Street trainee invitation seriously?",
+    "ground_truth": "Yes — quant interest is consistent across sources: Quantihack and imc-prosperity-3 repos on GitHub, plus an Instagram post from the UK's biggest quant hackathon where I made finals out of 800 online entrants. The Jane Street invite came in via gmail."
   },
   {
     "id": "q14",
     "category": "decision",
-    "question": "Should I follow through on my GSoC 2026 application?",
-    "ground_truth": "Yes — the proposal is already drafted in Drive, and it fits the pattern: lots of open-source-style projects on GitHub, strong AI focus."
+    "question": "Should I do another hackathon next month?",
+    "ground_truth": "Yes — recent pattern is strong: ETH Oxford win ($10k, IG-confirmed), IC Hack 26, the UK's biggest quant hackathon, plus Cerebral Valley's Agentic Evolution Hackathon emails landing in my inbox. I'm clearly in a hackathon era."
   },
   {
     "id": "q15",
     "category": "decision",
-    "question": "Should I plan a trip to Italy soon?",
-    "ground_truth": "Yes — I already have an Italy 2026 expenses sheet and a TimeSaver Travel Planner spun up. Logistics are halfway done."
+    "question": "I'm grinding French on Duolingo but planning an Italy 2026 trip — should I switch?",
+    "ground_truth": "Yes — Italy 2026 expenses and an Italy TimeSaver Travel Planner are already in my Sheets, and Duolingo is just sending me weekly French recap emails. Italian would actually serve the trip."
   },
   {
     "id": "q16",
@@ -98,25 +98,25 @@
   {
     "id": "q17",
     "category": "voice",
-    "question": "Respond on Slack to someone asking 'what kind of projects are you into?'",
-    "ground_truth": "AI and hackathon stuff mostly — claude-code-source-code, AI-Ethical-Debate-Arena, neuro-cue-companion, plus Oxford P5 engineering coursework. Casual, enthusiastic, lists the projects without overselling."
+    "question": "A teammate on Slack asks 'should we just use LangChain for this agent?' — respond.",
+    "ground_truth": "Skeptical, with receipts. My actual Slack quote: 'honestly the new claude tool use just works, switched off the langchain agent entirely and latency dropped 40%.' I'd push for native Anthropic SDK."
   },
   {
     "id": "q18",
     "category": "prediction",
-    "question": "If a quant firm recruiter reaches out, am I likely to engage?",
-    "ground_truth": "Yes — I've got Quantihack and imc-prosperity-3 repos, and an Insta post from the UK's biggest quant hackathon where I made the finals out of 800 online entrants. Quant is on my radar."
+    "question": "If a recruiter from a quant firm reaches out cold, am I likely to engage?",
+    "ground_truth": "Yes — Quantihack and imc-prosperity-3 repos on GitHub, finalist at the UK's biggest quant hackathon (per Insta), and a Jane Street trainee LinkedIn invite already sitting in my gmail. Quant is on my radar."
   },
   {
     "id": "q19",
     "category": "prediction",
-    "question": "If a friend asked 'are you more startup or big tech?', which way would I lean?",
-    "ground_truth": "Startup-leaning, but I'm openly torn. My Insta post 'Quant. Startups. Big Tech. Every path makes you feel like you're missing out' captures the ambivalence — but the hackathon wins, side projects, and ETH Oxford VC interest tilt me toward startups."
+    "question": "If a friend asked me to recommend a chill Discord server to hang out in, what flavor would I point them to?",
+    "ground_truth": "Something gaming-meme-flavored — I'm in Spud Zone, Potatoes, Cozy Campsite, Dank Memer, Genshin addicts, World of Warships. My Discord life skews casual/gaming, not professional."
   },
   {
     "id": "q20",
     "category": "prediction",
-    "question": "If someone asked me to recommend a Mandopop song, who would I name first?",
-    "ground_truth": "Jay Chou — he's my anchor subscription. Eric Chou would be the second pick."
+    "question": "If a recruiter asked 'are you AI-pilled?', what would my profile actually signal?",
+    "ground_truth": "Yes, deeply — claude-code-source-code and AI-Ethical-Debate-Arena repos on GitHub, multiple Anthropic-launch Reels on Instagram, a Slack post about ditching LangChain for raw Claude tool use, and ElevenLabs hackathon credits + Agentic Evolution Hackathon emails in my inbox. The signal is unambiguous."
   }
 ]

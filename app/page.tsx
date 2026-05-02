@@ -261,12 +261,40 @@ export default function Page() {
 
   const activeCard = activeIdx !== null ? cards[activeIdx] : null
 
+  const [customQ, setCustomQ] = useState("")
+  const submitCustom = useCallback(() => {
+    const text = customQ.trim()
+    if (!text || running) return
+    setCustomQ("")
+    setCards((prev) => {
+      const newIdx = prev.length
+      const newCard: CardState = {
+        question: {
+          id: `custom-${Date.now()}`,
+          category: "recall",
+          question: text,
+          ground_truth: "",
+        },
+        events: [],
+        answer: "",
+        status: "idle",
+      }
+      setTimeout(() => {
+        setActiveIdx(newIdx)
+        runOne(newIdx)
+      }, 0)
+      return [...prev, newCard]
+    })
+  }, [customQ, running, runOne])
+
   return (
     <div className="root">
       <header className="top">
         <div className="brand">
           <span className="brand-name serif italic">Persona</span>
-          <span className="brand-sub">agentic adaptive retrieval over your real memories</span>
+          <span className="brand-sep" aria-hidden>·</span>
+          <span className="brand-who serif">WeiWei Yuzhong Luo</span>
+          <span className="brand-sub">Engineering @ Oxford · Trinity College</span>
         </div>
         <button
           className="run-all"
@@ -366,6 +394,33 @@ export default function Page() {
         })}
       </div>
 
+      <form
+        className="ask"
+        onSubmit={(e) => {
+          e.preventDefault()
+          submitCustom()
+        }}
+      >
+        <span className="ask-label serif italic">Ask about WeiWei</span>
+        <input
+          className="ask-input"
+          type="text"
+          placeholder="what do they think about X? what would they say if…?"
+          value={customQ}
+          onChange={(e) => setCustomQ(e.target.value)}
+          disabled={running}
+          aria-label="Ask the persona a question"
+        />
+        <button
+          type="submit"
+          className="ask-submit serif italic"
+          disabled={running || customQ.trim().length === 0}
+          aria-label="Submit question"
+        >
+          ask <span className="ask-arrow">→</span>
+        </button>
+      </form>
+
       <button
         className="index-toggle"
         onClick={() => setIndexOpen((v) => !v)}
@@ -445,6 +500,16 @@ export default function Page() {
           font-weight: 500;
           color: var(--ink);
         }
+        .brand-sep {
+          color: var(--mute-2);
+          font-size: 16px;
+        }
+        .brand-who {
+          color: var(--ink-2);
+          font-size: 16px;
+          font-weight: 500;
+          letter-spacing: -0.005em;
+        }
         .brand-sub {
           color: var(--mute);
           font-size: 13px;
@@ -477,6 +542,60 @@ export default function Page() {
           border-bottom: 1px solid var(--rule);
           color: var(--ink-2);
           font-size: 13px;
+        }
+        .ask {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 12px 16px;
+          margin: 0 56px 16px;
+          border: 1px solid var(--rule);
+          border-radius: 2px;
+          background: var(--bg-tint);
+          transition: border-color 120ms ease;
+        }
+        .ask:focus-within { border-color: var(--accent); }
+        .ask-label {
+          color: var(--ink-3);
+          font-size: 13px;
+          letter-spacing: 0.01em;
+          flex-shrink: 0;
+        }
+        .ask-input {
+          flex: 1;
+          min-width: 0;
+          border: none;
+          background: transparent;
+          color: var(--ink);
+          font-size: 16px;
+          font-family: var(--font-serif);
+          outline: none;
+          padding: 4px 0;
+        }
+        .ask-input::placeholder {
+          color: var(--mute);
+          font-style: italic;
+        }
+        .ask-input:disabled { opacity: 0.5; }
+        .ask-submit {
+          color: var(--accent);
+          font-size: 14px;
+          padding: 4px 0;
+          border-bottom: 1px solid var(--accent);
+          background: transparent;
+          flex-shrink: 0;
+          display: inline-flex;
+          align-items: baseline;
+          gap: 6px;
+          transition: color 120ms ease, border-color 120ms ease;
+        }
+        .ask-submit:hover:not(:disabled) { color: #a1462e; border-color: #a1462e; }
+        .ask-submit:disabled { color: var(--mute); border-color: var(--rule); cursor: not-allowed; }
+        .ask-arrow { font-size: 16px; line-height: 1; }
+        @media (max-width: 720px) {
+          .ask { margin: 0 18px 12px; gap: 10px; padding: 10px 12px; }
+          .ask-label { display: none; }
+          .ask-input { font-size: 15px; }
         }
         .split {
           display: grid;
@@ -513,9 +632,11 @@ export default function Page() {
         }
         @media (max-width: 720px) {
           .top { padding: 18px 18px 0; flex-direction: column; align-items: flex-start; gap: 6px; }
-          .brand { gap: 8px; }
+          .brand { gap: 8px; flex-wrap: wrap; }
           .brand-name { font-size: 24px; }
-          .brand-sub { font-size: 12px; }
+          .brand-who { font-size: 14px; }
+          .brand-sub { font-size: 12px; flex-basis: 100%; }
+          .brand-sep { display: none; }
           .run-all { margin-top: 4px; }
           .index-toggle { display: block; margin-top: 12px; }
           .split { grid-template-columns: 1fr; padding: 24px 18px 48px; gap: 24px; }
@@ -544,7 +665,8 @@ function IndexEntry({
   selected: boolean
   onClick: () => void
 }) {
-  const correct = card.status === "done" && isMatch(card.answer, card.question.ground_truth)
+  const isCustom = !card.question.ground_truth
+  const correct = card.status === "done" && !isCustom && isMatch(card.answer, card.question.ground_truth)
   const num = pad2(index + 1)
 
   let trail: { text: string; tone: "match" | "differs" | "running" | "idle" | "error" } = {
@@ -553,9 +675,13 @@ function IndexEntry({
   }
   if (card.status === "running") trail = { text: "thinking…", tone: "running" }
   else if (card.status === "done") {
-    trail = correct
-      ? { text: `matched · ${formatSeconds(card.total_ms)}`, tone: "match" }
-      : { text: `differs · ${formatSeconds(card.total_ms)}`, tone: "differs" }
+    if (isCustom) {
+      trail = { text: `answered · ${formatSeconds(card.total_ms)}`, tone: "match" }
+    } else {
+      trail = correct
+        ? { text: `matched · ${formatSeconds(card.total_ms)}`, tone: "match" }
+        : { text: `differs · ${formatSeconds(card.total_ms)}`, tone: "differs" }
+    }
   } else if (card.status === "error" || card.status === "timeout")
     trail = { text: card.status === "timeout" ? "timed out" : "error", tone: "error" }
 
@@ -629,12 +755,15 @@ function ColdStart({ onStart }: { onStart: () => void }) {
   return (
     <article className="cold fade-up">
       <h1 className="serif">
-        An agent that answers <em>as you</em>.
+        An agent that answers <em>as WeiWei</em>.
       </h1>
       <p>
-        Twenty questions. For each one, the agent runs adaptive retrieval over your real memories — classifying
-        the query, rewriting it, searching Atlas Vector, re-ranking, and synthesizing an answer in your voice.
-        Every step shows.
+        Twenty questions, drawn from WeiWei&apos;s Gmail, Calendar, Slack, GitHub, Drive, Docs, Sheets, LinkedIn,
+        YouTube, Discord, and Instagram. The agent classifies each query, rewrites it, searches Atlas Vector,
+        re-ranks, and synthesizes an answer in WeiWei&apos;s voice. Every step shows.
+      </p>
+      <p className="cold-ask">
+        Or just ask your own — the input is up top.
       </p>
       <button className="start serif italic" onClick={onStart}>
         Begin with the first question →
@@ -660,6 +789,12 @@ function ColdStart({ onStart }: { onStart: () => void }) {
           font-size: 17px;
           line-height: 1.6;
         }
+        .cold-ask {
+          color: var(--mute);
+          font-size: 14px;
+          font-style: italic;
+          margin-top: -8px;
+        }
         .start {
           align-self: flex-start;
           margin-top: 6px;
@@ -684,7 +819,8 @@ function Document({
   layoutVersion: number
 }) {
   const { question, events, answer, status, total_ms, error_message } = card
-  const correct = status === "done" && isMatch(answer, question.ground_truth)
+  const isCustom = !question.ground_truth
+  const correct = status === "done" && !isCustom && isMatch(answer, question.ground_truth)
 
   return (
     <article className="doc fade-up" key={card.question.id}>
@@ -707,9 +843,15 @@ function Document({
       {status !== "error" && (
         <section className="verdict">
           {status === "done" ? (
-            <span className={`verdict-rule serif italic ${correct ? "match" : "differs"}`}>
-              — {correct ? "matched" : "differs"}{total_ms ? ` · ${formatSeconds(total_ms)}` : ""} —
-            </span>
+            isCustom ? (
+              <span className="verdict-rule serif italic match">
+                — answered{total_ms ? ` · ${formatSeconds(total_ms)}` : ""} —
+              </span>
+            ) : (
+              <span className={`verdict-rule serif italic ${correct ? "match" : "differs"}`}>
+                — {correct ? "matched" : "differs"}{total_ms ? ` · ${formatSeconds(total_ms)}` : ""} —
+              </span>
+            )
           ) : status === "running" ? (
             <span className="verdict-rule serif italic running">— still working —</span>
           ) : null}
@@ -721,7 +863,7 @@ function Document({
           <p className="agent serif">
             {answer || (status === "running" ? <span className="placeholder italic">composing…</span> : "—")}
           </p>
-          {status === "done" && !correct && (
+          {status === "done" && !isCustom && !correct && (
             <p className="truth">
               <span className="serif italic prefix">You remembered: </span>
               <span className="serif">{question.ground_truth}</span>
@@ -1425,6 +1567,30 @@ function ClassifyChip({ events }: { events: TraceEvent[] }) {
 
 // ─── Candidate bars — score-ranked top-K from latest hit-producing tool ────
 
+function describeScore(
+  ev: Extract<TraceEvent, { type: "tool_result" }>,
+  args: Record<string, unknown> | undefined,
+): string {
+  if (ev.tool === "rerank") {
+    const criterion = (args?.criterion as string) ?? "relevance"
+    const hasQuery = typeof args?.query === "string" && (args.query as string).length > 0
+    if (criterion === "relevance" && hasQuery) return "LLM 0–10"
+    if (criterion === "recency") return "recency 0–1"
+    if (criterion === "sentiment_negative") return "negativity"
+    if (criterion === "sentiment_positive") return "positivity"
+    if (criterion === "authorship_user") return "authored by you"
+    return "rerank score"
+  }
+  if (ev.tool === "search") {
+    const mode = (args?.mode as string) ?? "hybrid"
+    if (mode === "vector") return "cosine"
+    if (mode === "text") return "BM25"
+    return "RRF 0–1"
+  }
+  if (ev.tool === "cross_reference") return "shared attribute"
+  return "score"
+}
+
 function CandidateBars({ events }: { events: TraceEvent[] }) {
   const latest = useMemo(() => {
     for (let i = events.length - 1; i >= 0; i--) {
@@ -1442,27 +1608,42 @@ function CandidateBars({ events }: { events: TraceEvent[] }) {
   }, [events])
 
   if (!latest || !latest.candidates) return null
-  const cands = latest.candidates.slice(0, 8)
-  const scores = cands.map((c) => c.score)
-  const maxScore = Math.max(...scores)
-  const minScore = Math.min(...scores)
-  const range = Math.max(maxScore - minScore, 1e-6)
+
+  // Find the matching tool_call so we know the criterion (rerank) or mode (search).
+  const callArgs = (() => {
+    for (const e of events) {
+      if (e.type === "tool_call" && e.tool_use_id === latest.tool_use_id) return e.args
+    }
+    return undefined
+  })()
+
+  // Sort by score descending so bar lengths and row order always agree.
+  const cands = [...latest.candidates]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8)
+
+  const maxScore = Math.max(...cands.map((c) => c.score), 1e-6)
+  const scoreLabel = describeScore(latest, callArgs)
 
   return (
     <section className="cands fade-up">
       <div className="cands-head serif italic">
         — top candidates · <span className="cands-tool">{latest.tool}</span>
+        {" · "}
+        <span className="cands-meta">{scoreLabel}</span>
         {" "}
         <span className="cands-count">({cands.length})</span>
       </div>
       <ul className="cand-list">
-        {cands.map((c) => {
-          const norm = (c.score - minScore) / range
-          const pct = Math.max(8, Math.round(norm * 100))
+        {cands.map((c, i) => {
+          // Bar = score / max within this set. Tight clusters look tight,
+          // wide spreads look wide — honest about the underlying signal.
+          const pct = Math.max(4, Math.round((c.score / maxScore) * 100))
           const color = SOURCE_COLOR[c.source ?? ""] ?? "var(--mute)"
           const srcLabel = SOURCE_LABEL[c.source ?? ""] ?? c.source ?? "?"
           return (
             <li key={c.id} className="cand-row">
+              <span className="cand-rank tnum">#{i + 1}</span>
               <span className="cand-src" style={{ color }}>
                 {srcLabel}
               </span>
@@ -1496,6 +1677,13 @@ function CandidateBars({ events }: { events: TraceEvent[] }) {
           font-style: italic;
           font-family: var(--font-serif);
         }
+        .cands-meta {
+          color: var(--ink-3);
+          font-style: normal;
+          font-family: var(--font-sans);
+          font-size: 11px;
+          letter-spacing: 0.01em;
+        }
         .cands-count {
           color: var(--mute);
           font-style: normal;
@@ -1510,11 +1698,19 @@ function CandidateBars({ events }: { events: TraceEvent[] }) {
         }
         .cand-row {
           display: grid;
-          grid-template-columns: 70px 44px 90px 1fr;
+          grid-template-columns: 28px 70px 44px 90px 1fr;
           gap: 10px;
           align-items: center;
           font-size: 12px;
           line-height: 1.3;
+        }
+        .cand-rank {
+          color: var(--mute);
+          font-family: var(--font-sans);
+          font-variant-numeric: tabular-nums;
+          font-size: 11px;
+          text-align: right;
+          letter-spacing: 0.01em;
         }
         .cand-src {
           font-family: var(--font-sans);
@@ -1548,7 +1744,7 @@ function CandidateBars({ events }: { events: TraceEvent[] }) {
         }
         @media (max-width: 720px) {
           .cand-row {
-            grid-template-columns: 60px 40px 1fr;
+            grid-template-columns: 24px 60px 40px 1fr;
           }
           .cand-preview { display: none; }
         }

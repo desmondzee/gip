@@ -113,9 +113,10 @@ async function runTextSearch(
 }
 
 // Atlas vectorSearch only accepts filters on fields declared `type: "filter"` in
-// the index (currently `source`, `ts`). Anything else (metadata.*, etc.) we
-// apply as a $match stage after the vector search.
-const VECTOR_FILTER_FIELDS = new Set(["source", "ts"])
+// the index. After eng review 4A, metadata.from_user is also a vector-index
+// filter field — so search_voice's authorship filter pushes into vectorSearch
+// instead of post-matching. Other metadata.* keys still go through $match.
+const VECTOR_FILTER_FIELDS = new Set(["source", "ts", "metadata.from_user"])
 
 function splitFilter(
   filter: Record<string, unknown> | undefined,
@@ -151,8 +152,11 @@ function reciprocalRankFusion(
       }
     })
   }
+  // Maximum theoretical fused score: present at rank 0 in both lists ⇒ 2/(C+0).
+  // Normalize so `score` lives on a 0..1 scale and is rank-monotonic (top = best).
+  const maxPossible = 2 / C
   return Array.from(fused.values())
     .sort((x, y) => y.fused - x.fused)
     .slice(0, k)
-    .map(({ fused: _f, ...rest }) => rest)
+    .map(({ fused, ...rest }) => ({ ...rest, score: fused / maxPossible }))
 }

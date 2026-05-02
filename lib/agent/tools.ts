@@ -239,21 +239,37 @@ export async function dispatchTool(
   }
 }
 
+// Each rerank criterion produces a fresh `score` on a 0..1 scale that reflects
+// the criterion itself — so bar charts in the trace always agree with row order.
 function rerankHits(hits: SearchHit[], criterion: string): SearchHit[] {
-  const arr = [...hits]
+  if (hits.length === 0) return hits
   switch (criterion) {
-    case "recency":
-      return arr.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime())
+    case "recency": {
+      const times = hits.map((h) => new Date(h.ts).getTime())
+      const newest = Math.max(...times)
+      const oldest = Math.min(...times)
+      const span = Math.max(newest - oldest, 1)
+      return hits
+        .map((h) => ({ ...h, score: (new Date(h.ts).getTime() - oldest) / span }))
+        .sort((a, b) => b.score - a.score)
+    }
     case "relevance":
-      return arr.sort((a, b) => b.score - a.score)
+      // Heuristic fallback (no LLM query): keep the underlying retrieval score.
+      return [...hits].sort((a, b) => b.score - a.score)
     case "sentiment_negative":
-      return arr.sort((a, b) => sentimentScore(b.text) - sentimentScore(a.text))
+      return hits
+        .map((h) => ({ ...h, score: Math.max(0, sentimentScore(h.text)) }))
+        .sort((a, b) => b.score - a.score)
     case "sentiment_positive":
-      return arr.sort((a, b) => -sentimentScore(b.text) + sentimentScore(a.text))
+      return hits
+        .map((h) => ({ ...h, score: Math.max(0, -sentimentScore(h.text)) }))
+        .sort((a, b) => b.score - a.score)
     case "authorship_user":
-      return arr.sort((a, b) => Number(isUserAuthored(b)) - Number(isUserAuthored(a)))
+      return hits
+        .map((h) => ({ ...h, score: isUserAuthored(h) ? 1 : 0 }))
+        .sort((a, b) => b.score - a.score)
     default:
-      return arr
+      return [...hits]
   }
 }
 
