@@ -291,10 +291,9 @@ export default function Page() {
     <div className="root">
       <header className="top">
         <div className="brand">
-          <span className="brand-name serif italic">Persona</span>
-          <span className="brand-sep" aria-hidden>·</span>
-          <span className="brand-who serif">WeiWei Yuzhong Luo</span>
-          <span className="brand-sub">Engineering @ Oxford · Trinity College</span>
+          <span className="brand-mark serif italic">Persona</span>
+          <span className="brand-of serif">of</span>
+          <span className="brand-who">WeiWei Yuzhong Luo</span>
         </div>
         <button
           className="run-all"
@@ -307,92 +306,54 @@ export default function Page() {
         </button>
       </header>
 
-      <div
-        style={{
-          display: "flex",
-          gap: "16px",
-          flexWrap: "wrap",
-          padding: "10px 14px",
-          marginBottom: "12px",
-          border: "1px solid var(--rule)",
-          borderRadius: "2px",
-          background: "var(--bg-tint)",
-          alignItems: "center",
-        }}
-      >
-        <span className="serif italic" style={{ color: "var(--ink-3)", fontSize: "13px", marginRight: "4px" }}>
-          Sources
-        </span>
-        {SOURCES.map((src) => {
-          const cs = connectStatus[src]
-          const isConnected = cs === "connected"
-          const notConnected = cs === "not_connected"
-          const connectUrl = connectUrls[src]
-          const label = SOURCE_LABEL[src] ?? src.replace("_msgs", "").replace("_events", "")
-          const dot =
-            cs === "connected"
-              ? "var(--match)"
-              : cs === "not_connected"
-                ? "var(--differs)"
-                : cs === "checking"
-                  ? "var(--live)"
-                  : "var(--mute-2)"
-          return (
-            <div key={src} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span
-                title={cs}
-                className={cs === "checking" ? "live-rail" : ""}
-                style={{
-                  width: "7px",
-                  height: "7px",
-                  borderRadius: "50%",
-                  display: "inline-block",
-                  background: dot,
-                  flexShrink: 0,
-                }}
-              />
-              {notConnected && connectUrl ? (
-                <a
-                  href={connectUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    fontSize: "12px",
-                    color: "var(--differs)",
-                    textDecoration: "underline",
-                    textUnderlineOffset: "3px",
-                  }}
-                >
-                  connect {label} ↗
-                </a>
-              ) : (
-                <button
-                  onClick={() => runIngest(src)}
-                  disabled={ingestStatus[src] === "running" || !isConnected}
-                  style={{
-                    fontSize: "12px",
-                    color: "var(--ink-2)",
-                    textDecoration: "underline",
-                    textUnderlineOffset: "3px",
-                  }}
-                >
-                  {ingestStatus[src] === "running" ? `${label}…` : label}
-                </button>
-              )}
-              {ingestMsg[src] && (
+      <section className="sources" aria-label="Memory sources">
+        <span className="sources-label">Sources</span>
+        <ul className="sources-list">
+          {SOURCES.map((src) => {
+            const cs = connectStatus[src]
+            const isConnected = cs === "connected"
+            const notConnected = cs === "not_connected"
+            const connectUrl = connectUrls[src]
+            const label = SOURCE_LABEL[src] ?? src.replace("_msgs", "").replace("_events", "")
+            const stateClass =
+              cs === "connected"
+                ? "is-connected"
+                : cs === "not_connected"
+                  ? "is-disconnected"
+                  : cs === "checking"
+                    ? "is-checking"
+                    : "is-unknown"
+            const isRunning = ingestStatus[src] === "running"
+            return (
+              <li key={src} className={`source ${stateClass}`}>
                 <span
-                  style={{
-                    fontSize: "11px",
-                    color: ingestStatus[src] === "error" ? "var(--differs)" : "var(--match)",
-                  }}
-                >
-                  {ingestMsg[src]}
-                </span>
-              )}
-            </div>
-          )
-        })}
-      </div>
+                  className={`source-dot ${cs === "checking" ? "live-rail" : ""}`}
+                  title={cs}
+                  aria-hidden
+                />
+                {notConnected && connectUrl ? (
+                  <a className="source-action source-action--connect" href={connectUrl} target="_blank" rel="noreferrer">
+                    connect {label}
+                  </a>
+                ) : (
+                  <button
+                    className="source-action"
+                    onClick={() => runIngest(src)}
+                    disabled={isRunning || !isConnected}
+                  >
+                    {isRunning ? `${label}…` : label}
+                  </button>
+                )}
+                {ingestMsg[src] && (
+                  <span className={`source-msg ${ingestStatus[src] === "error" ? "source-msg--error" : ""}`}>
+                    {ingestMsg[src]}
+                  </span>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      </section>
 
       <form
         className="ask"
@@ -486,43 +447,38 @@ export default function Page() {
           display: flex;
           align-items: baseline;
           justify-content: space-between;
-          padding: 28px 56px 0;
+          padding: 32px 56px 24px;
           gap: 24px;
         }
         .brand {
           display: flex;
           align-items: baseline;
-          gap: 14px;
+          gap: 10px;
           min-width: 0;
         }
-        .brand-name {
-          font-size: 28px;
+        .brand-mark {
+          font-size: 26px;
           font-weight: 500;
           color: var(--ink);
+          letter-spacing: -0.012em;
         }
-        .brand-sep {
-          color: var(--mute-2);
-          font-size: 16px;
+        .brand-of {
+          color: var(--mute);
+          font-size: 14px;
+          font-style: italic;
         }
         .brand-who {
           color: var(--ink-2);
-          font-size: 16px;
+          font-size: 14px;
           font-weight: 500;
           letter-spacing: -0.005em;
-        }
-        .brand-sub {
-          color: var(--mute);
-          font-size: 13px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
         }
         .run-all {
           display: inline-flex;
           align-items: baseline;
           gap: 8px;
           color: var(--ink);
-          font-size: 14px;
+          font-size: 13px;
           padding: 4px 0;
           border-bottom: 1px solid var(--ink);
           transition: color 120ms ease, border-color 120ms ease;
@@ -532,7 +488,7 @@ export default function Page() {
           border-color: var(--accent);
         }
         .run-all .arrow {
-          font-size: 16px;
+          font-size: 14px;
           line-height: 1;
         }
         .run-all:disabled { color: var(--mute); border-color: var(--rule); }
@@ -543,18 +499,90 @@ export default function Page() {
           color: var(--ink-2);
           font-size: 13px;
         }
+
+        /* Sources strip — quiet hairline-bounded row, neutral palette */
+        .sources {
+          display: flex;
+          align-items: baseline;
+          gap: 18px;
+          flex-wrap: wrap;
+          padding: 14px 56px;
+          border-top: 1px solid var(--rule-soft);
+        }
+        .sources-label {
+          color: var(--mute);
+          font-size: 10px;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          flex-shrink: 0;
+        }
+        .sources-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px 18px;
+          list-style: none;
+          padding: 0;
+          margin: 0;
+        }
+        .source {
+          display: inline-flex;
+          align-items: baseline;
+          gap: 7px;
+          font-size: 12px;
+        }
+        .source-dot {
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+          display: inline-block;
+          background: var(--mute-2);
+          flex-shrink: 0;
+          transform: translateY(-1px);
+        }
+        .source.is-connected .source-dot { background: var(--ink-3); }
+        .source.is-disconnected .source-dot { background: var(--accent); opacity: 0.65; }
+        .source.is-checking .source-dot { background: var(--ink-3); }
+        .source.is-unknown .source-dot { background: var(--mute-2); opacity: 0.6; }
+        .source-action {
+          font-size: 12px;
+          color: var(--ink-2);
+          padding: 2px 0;
+          border-bottom: 1px solid transparent;
+          transition: color 120ms ease, border-color 120ms ease;
+        }
+        .source-action:hover:not(:disabled) {
+          color: var(--accent);
+          border-bottom-color: var(--accent);
+        }
+        .source-action:disabled { color: var(--mute); cursor: default; }
+        .source-action--connect {
+          color: var(--accent);
+          border-bottom: 1px solid var(--accent);
+        }
+        .source-action--connect:hover {
+          color: #a1462e;
+          border-bottom-color: #a1462e;
+        }
+        .source-msg {
+          font-size: 11px;
+          color: var(--ink-3);
+          font-variant-numeric: tabular-nums;
+          letter-spacing: 0.01em;
+        }
+        .source-msg--error { color: var(--differs); }
+
+        /* Ask form — no card, hairline-bounded strip */
         .ask {
           display: flex;
           align-items: center;
           gap: 14px;
-          padding: 12px 16px;
-          margin: 0 56px 16px;
-          border: 1px solid var(--rule);
-          border-radius: 2px;
-          background: var(--bg-tint);
-          transition: border-color 120ms ease;
+          padding: 16px 56px;
+          margin: 0;
+          border-top: 1px solid var(--rule-soft);
+          border-bottom: 1px solid var(--rule-soft);
+          transition: background-color 120ms ease;
         }
-        .ask:focus-within { border-color: var(--accent); }
+        .ask:focus-within { background-color: rgba(193, 88, 58, 0.025); }
         .ask-label {
           color: var(--ink-3);
           font-size: 13px;
@@ -593,7 +621,8 @@ export default function Page() {
         .ask-submit:disabled { color: var(--mute); border-color: var(--rule); cursor: not-allowed; }
         .ask-arrow { font-size: 16px; line-height: 1; }
         @media (max-width: 720px) {
-          .ask { margin: 0 18px 12px; gap: 10px; padding: 10px 12px; }
+          .sources { padding: 12px 18px; gap: 10px 14px; }
+          .ask { padding: 14px 18px; gap: 10px; }
           .ask-label { display: none; }
           .ask-input { font-size: 15px; }
         }
@@ -602,7 +631,7 @@ export default function Page() {
           grid-template-columns: 360px 1fr;
           flex: 1;
           min-height: 0;
-          padding: 40px 56px 64px;
+          padding: 48px 56px 64px;
           gap: 56px;
         }
         .index {
@@ -631,13 +660,11 @@ export default function Page() {
           .index { padding-right: 16px; }
         }
         @media (max-width: 720px) {
-          .top { padding: 18px 18px 0; flex-direction: column; align-items: flex-start; gap: 6px; }
+          .top { padding: 22px 18px 14px; flex-direction: column; align-items: flex-start; gap: 8px; }
           .brand { gap: 8px; flex-wrap: wrap; }
-          .brand-name { font-size: 24px; }
-          .brand-who { font-size: 14px; }
-          .brand-sub { font-size: 12px; flex-basis: 100%; }
-          .brand-sep { display: none; }
-          .run-all { margin-top: 4px; }
+          .brand-mark { font-size: 22px; }
+          .brand-who { font-size: 13px; }
+          .run-all { margin-top: 2px; }
           .index-toggle { display: block; margin-top: 12px; }
           .split { grid-template-columns: 1fr; padding: 24px 18px 48px; gap: 24px; }
           .index {
@@ -765,8 +792,8 @@ function ColdStart({ onStart }: { onStart: () => void }) {
       <p className="cold-ask">
         Or just ask your own — the input is up top.
       </p>
-      <button className="start serif italic" onClick={onStart}>
-        Begin with the first question →
+      <button className="start" onClick={onStart}>
+        Begin with the first question <span aria-hidden>→</span>
       </button>
       <style jsx>{`
         .cold {
@@ -797,11 +824,14 @@ function ColdStart({ onStart }: { onStart: () => void }) {
         }
         .start {
           align-self: flex-start;
-          margin-top: 6px;
-          font-size: 16px;
+          margin-top: 8px;
+          font-family: var(--font-sans);
+          font-size: 14px;
           color: var(--accent);
           padding: 4px 0;
           border-bottom: 1px solid var(--accent);
+          letter-spacing: 0.005em;
+          transition: color 120ms ease, border-color 120ms ease;
         }
         .start:hover { color: #a1462e; border-color: #a1462e; }
       `}</style>
@@ -830,7 +860,7 @@ function Document({
         <section className="errsec">
           <p className="serif italic">The agent couldn&apos;t complete this question.</p>
           <p className="errmsg">{error_message ?? "unknown error"}</p>
-          <button className="retry serif italic" onClick={onRetry}>Try again →</button>
+          <button className="retry" onClick={onRetry}>Try again <span aria-hidden>→</span></button>
         </section>
       ) : (
         <>
@@ -931,8 +961,12 @@ function Document({
           color: var(--accent);
           padding: 2px 0;
           border-bottom: 1px solid var(--accent);
-          font-size: 14px;
+          font-family: var(--font-sans);
+          font-size: 13px;
+          letter-spacing: 0.005em;
+          transition: color 120ms ease, border-color 120ms ease;
         }
+        .retry:hover { color: #a1462e; border-color: #a1462e; }
         @media (max-width: 720px) {
           h1 { font-size: 30px; }
           .agent { font-size: 19px; }
@@ -1639,20 +1673,15 @@ function CandidateBars({ events }: { events: TraceEvent[] }) {
           // Bar = score / max within this set. Tight clusters look tight,
           // wide spreads look wide — honest about the underlying signal.
           const pct = Math.max(4, Math.round((c.score / maxScore) * 100))
-          const color = SOURCE_COLOR[c.source ?? ""] ?? "var(--mute)"
           const srcLabel = SOURCE_LABEL[c.source ?? ""] ?? c.source ?? "?"
+          const isTop = i === 0
           return (
-            <li key={c.id} className="cand-row">
+            <li key={c.id} className={`cand-row ${isTop ? "is-top" : ""}`}>
               <span className="cand-rank tnum">#{i + 1}</span>
-              <span className="cand-src" style={{ color }}>
-                {srcLabel}
-              </span>
+              <span className="cand-src">{srcLabel}</span>
               <span className="cand-score tnum">{c.score.toFixed(2)}</span>
               <div className="cand-bar-wrap">
-                <div
-                  className="cand-bar"
-                  style={{ width: `${pct}%`, background: color }}
-                />
+                <div className="cand-bar" style={{ width: `${pct}%` }} />
               </div>
               <span className="cand-preview" title={c.text_preview}>
                 {c.text_preview}
@@ -1667,22 +1696,24 @@ function CandidateBars({ events }: { events: TraceEvent[] }) {
           margin-top: -8px;
         }
         .cands-head {
-          font-size: 12px;
+          font-family: var(--font-sans);
+          font-size: 11px;
           color: var(--mute);
-          letter-spacing: 0.02em;
-          margin-bottom: 8px;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          margin-bottom: 10px;
+          font-style: normal;
         }
         .cands-tool {
           color: var(--ink-2);
-          font-style: italic;
-          font-family: var(--font-serif);
+          font-style: normal;
+          font-family: var(--font-sans);
         }
         .cands-meta {
           color: var(--ink-3);
-          font-style: normal;
           font-family: var(--font-sans);
           font-size: 11px;
-          letter-spacing: 0.01em;
+          letter-spacing: 0.04em;
         }
         .cands-count {
           color: var(--mute);
@@ -1694,7 +1725,7 @@ function CandidateBars({ events }: { events: TraceEvent[] }) {
           margin: 0;
           display: flex;
           flex-direction: column;
-          gap: 3px;
+          gap: 4px;
         }
         .cand-row {
           display: grid;
@@ -1715,8 +1746,10 @@ function CandidateBars({ events }: { events: TraceEvent[] }) {
         .cand-src {
           font-family: var(--font-sans);
           font-size: 12px;
+          color: var(--ink-3);
           letter-spacing: 0.005em;
         }
+        .cand-row.is-top .cand-src { color: var(--ink); }
         .cand-score {
           font-family: var(--font-sans);
           font-variant-numeric: tabular-nums;
@@ -1725,15 +1758,20 @@ function CandidateBars({ events }: { events: TraceEvent[] }) {
           text-align: right;
         }
         .cand-bar-wrap {
-          height: 6px;
-          background: var(--rule-soft, rgba(255,255,255,0.06));
-          border-radius: 1px;
+          height: 4px;
+          background: var(--rule-soft);
+          border-radius: 0;
           overflow: hidden;
         }
         .cand-bar {
           height: 100%;
+          background: var(--ink-3);
+          opacity: 0.4;
+          transition: width 240ms ease;
+        }
+        .cand-row.is-top .cand-bar {
+          background: var(--accent);
           opacity: 0.7;
-          transition: width 200ms ease;
         }
         .cand-preview {
           color: var(--ink-3);
