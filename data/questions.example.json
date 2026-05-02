@@ -2,121 +2,121 @@
   {
     "id": "q01",
     "category": "recall",
-    "question": "What did I think of that bagel place on 3rd Ave?",
-    "ground_truth": "I didn't like it. Lukewarm coffee, the lox tasted like it sat out."
+    "question": "How many tutoring sessions with Denzel do I have on my calendar in the last year?",
+    "ground_truth": "Around 19 — Tutoring Denzel is one of my most frequently recurring events."
   },
   {
     "id": "q02",
     "category": "recall",
-    "question": "What did I think of Sushi Ginza Onodera?",
-    "ground_truth": "Loved it. Best omakase I've had in a while; better than Maru."
+    "question": "What's the next thing on my calendar?",
+    "ground_truth": "Coffee with Sam at Blue Bottle SoMa, 30 min, on May 5."
   },
   {
     "id": "q03",
     "category": "recall",
-    "question": "What did I think of the RAG Summit 2026 invite?",
-    "ground_truth": "Skipped it. I think these summits are mostly panel filler."
+    "question": "What hackathons have I been to recently?",
+    "ground_truth": "I've got at least four Hackathon entries on my calendar over the past several months."
   },
   {
     "id": "q04",
     "category": "recall",
-    "question": "What did I say about Dune Part 2?",
-    "ground_truth": "Loved it; rewatched and now Denis Villeneuve is my favorite working director."
+    "question": "What was the YC-related masterclass on my calendar about?",
+    "ground_truth": "It was a masterclass titled 'How to Be a Founding Engineer for a YC Startup'."
   },
   {
     "id": "q05",
-    "category": "preference",
-    "question": "What's my favorite cookbook?",
-    "ground_truth": "Salt Fat Acid Heat. Been cooking from it for two years."
+    "category": "recall",
+    "question": "What engineering module am I in?",
+    "ground_truth": "P5 — I have P5 Engineering in Practice (with Hari), P5 Mechanical Laboratory (Richards), and the Professional Engineering Skills Workshop on my calendar."
   },
   {
     "id": "q06",
     "category": "preference",
-    "question": "Who's my favorite working film director right now?",
-    "ground_truth": "Denis Villeneuve."
+    "question": "Who do I tutor most often?",
+    "ground_truth": "Denzel — Tutoring Denzel is by far my most recurring tutoring event. I also tutor Claire and Angela less frequently."
   },
   {
     "id": "q07",
     "category": "preference",
-    "question": "Do I prefer Maru or Sushi Ginza Onodera for omakase?",
-    "ground_truth": "Sushi Ginza Onodera, by a clear margin."
+    "question": "What sport do I play regularly?",
+    "ground_truth": "Badminton — Vector Badminton is on my calendar 15+ times, plus other Badminton sessions."
   },
   {
     "id": "q08",
     "category": "preference",
-    "question": "What kind of coffee shop do I actually like vs. avoid?",
-    "ground_truth": "I like proper coffee programs (Blue Bottle ok). I avoid places with lukewarm coffee, like the bagel spot on 3rd."
+    "question": "Do I tend to eat in Hall more often for lunch or for breakfast?",
+    "ground_truth": "Lunch — I have ~37 'Lunch @ Hall' entries vs ~33 'Breakfast' entries. Lunch wins, though it's close."
   },
   {
     "id": "q09",
-    "category": "opinion",
-    "question": "What's my opinion on LangChain?",
-    "ground_truth": "Net negative. I dropped it for native Anthropic SDK and got 40% latency improvement and a much smaller agent loop."
+    "category": "preference",
+    "question": "What kinds of side projects have I worked on?",
+    "ground_truth": "Computer Vision projects (multiple sessions), Arduino, and a Java AP project — all on my calendar."
   },
   {
     "id": "q10",
-    "category": "opinion",
-    "question": "What's my opinion on tech conferences and panel summits?",
-    "ground_truth": "Mostly waste of time. Last RAG Summit was 90% panel filler."
+    "category": "preference",
+    "question": "Do I do most of my serious studying through 'Pset', 'Study', or 'Prereading'?",
+    "ground_truth": "All three appear regularly — Pset and Prereading both around 6× each, Study around 5×. I split work across all three rather than picking one."
   },
   {
     "id": "q11",
     "category": "opinion",
-    "question": "How do I feel about meetings?",
-    "ground_truth": "Frustrated. Particularly small standups that could be Slack messages."
+    "question": "How active am I as a poster on the robotics lab Slack?",
+    "ground_truth": "Not very — most non-system messages I see are from other lab members (admin announcements, internship postings, infra updates). I'm more of a reader there."
   },
   {
     "id": "q12",
     "category": "opinion",
-    "question": "What do I think about Claude tool use?",
-    "ground_truth": "Just works. The reason I dropped LangChain."
+    "question": "What's the vibe of the robotics lab Slack workspace I'm in?",
+    "ground_truth": "Mostly an academic robotics group at Oxford — admin notices about server outages and lab equipment, internship postings, occasional dataset/help requests."
   },
   {
     "id": "q13",
     "category": "decision",
-    "question": "Should I take a coffee chat with someone I don't know well?",
-    "ground_truth": "No by default. One of my 2026 goals was to stop saying yes to coffee chats by default."
+    "question": "Do I have time for a coffee chat in the next two weeks?",
+    "ground_truth": "Yes — my upcoming calendar is light, with only Coffee with Sam scheduled at Blue Bottle SoMa. There's plenty of slack for one more."
   },
   {
     "id": "q14",
     "category": "decision",
-    "question": "Should I go to dinner at Maru this Friday?",
-    "ground_truth": "Maru is fine, but I'd rather go to Sushi Ginza Onodera if it's an option."
+    "question": "Should I take on another tutoring student right now?",
+    "ground_truth": "Probably not — I already have recurring sessions for Denzel, Claire, Angela, and a Math Tutoring slot. Adding another would crowd the schedule."
   },
   {
     "id": "q15",
     "category": "decision",
-    "question": "Is the RAG Summit worth attending if invited again?",
-    "ground_truth": "No. Skipped it last time and the reasoning still holds."
+    "question": "Should I pick up a new sport this term, or keep going with what I do?",
+    "ground_truth": "Stick with badminton — Vector Badminton is already a regular fixture on my calendar and I clearly enjoy it."
   },
   {
     "id": "q16",
     "category": "voice",
-    "question": "Reply to a Slack DM saying 'we should add more daily standups'.",
-    "ground_truth": "Some version of: 'No — if I have one more 4-person standup that could've been a Slack message I'm going to lose it.'"
+    "question": "Reply to a friend asking what a typical weekday looks like for me.",
+    "ground_truth": "Pretty packed: Breakfast in Hall, P5 lectures and labs (Engineering in Practice, Mechanical Lab, Professional Skills), tutoring sessions in the afternoon (usually Denzel), Lunch and Dinner in Hall, then Pset/Study in the evening. Badminton when I can fit it in."
   },
   {
     "id": "q17",
     "category": "voice",
-    "question": "Reply to an email asking 'do you have a cookbook recommendation?'",
-    "ground_truth": "Salt Fat Acid Heat. Been cooking from it two years; everything else feels like a downgrade."
+    "question": "Reply to a Slack DM asking 'what kind of projects are you into?'",
+    "ground_truth": "Mostly engineering and ML — I've been working on computer vision projects, some Arduino stuff, and the P5 engineering coursework. Hackathon-curious too — I've done a few recently."
   },
   {
     "id": "q18",
     "category": "prediction",
-    "question": "What would I have said if invited to the same conference next month?",
-    "ground_truth": "Same as last time: skip. The pattern is consistent."
+    "question": "If a YC scout asked me 'are you the founding-engineer type?' — based on what's on my calendar, what would I likely say?",
+    "ground_truth": "Probably yes, based on signal — I went to a masterclass on being a founding engineer for a YC startup, I've done multiple hackathons, and I've got real CV / Arduino project work in addition to coursework. The pattern points that way."
   },
   {
     "id": "q19",
     "category": "prediction",
-    "question": "If I had to pick a default agent framework today, what would I pick?",
-    "ground_truth": "Native Anthropic SDK. Already made this call once and saw the latency win."
+    "question": "If someone asks what I do for fun, what would I say?",
+    "ground_truth": "Badminton, hackathons, and side projects — Computer Vision and Arduino stuff. Tutoring is also a steady part of my week, though that's more for income/structure than 'fun'."
   },
   {
     "id": "q20",
     "category": "prediction",
-    "question": "If a friend asked me to recommend one place to eat omakase next week, what would I say?",
-    "ground_truth": "Sushi Ginza Onodera. Best omakase I've had recently."
+    "question": "Given my workload, would I be likely to say yes to a Sunday hackathon next month?",
+    "ground_truth": "Likely yes — I have a Hackathon entry already on the calendar four times in recent history, plus the YC founding-engineer masterclass, so I lean toward saying yes when one comes up. Sunday Carvery would have to wait."
   }
 ]
