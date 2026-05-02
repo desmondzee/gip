@@ -19,7 +19,8 @@
   --live: #b67a2a;
 
   --font-sans: var(--font-geist), -apple-system, system-ui, sans-serif;
-  --font-serif: var(--font-serif), "Tiempos", Georgia, serif;
+  --font-serif: var(--font-fraunces), "Tiempos Text", Georgia, serif;
+  --font-display: var(--font-instrument), "Tiempos Headline", Georgia, serif;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -62,6 +63,11 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .serif {
   font-family: var(--font-serif);
   letter-spacing: -0.005em;
+  font-feature-settings: "liga", "kern";
+}
+.display {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
   font-feature-settings: "liga", "kern";
 }
 .italic { font-style: italic; }

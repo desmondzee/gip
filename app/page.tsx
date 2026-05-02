@@ -291,7 +291,7 @@ export default function Page() {
     <div className="root">
       <header className="top">
         <div className="brand">
-          <span className="brand-mark serif italic">Persona</span>
+          <span className="brand-mark display italic">Persona</span>
           <span className="brand-of serif">of</span>
           <span className="brand-who">WeiWei Yuzhong Luo</span>
         </div>
@@ -457,10 +457,10 @@ export default function Page() {
           min-width: 0;
         }
         .brand-mark {
-          font-size: 26px;
-          font-weight: 500;
+          font-size: 28px;
+          font-weight: 400;
           color: var(--ink);
-          letter-spacing: -0.012em;
+          letter-spacing: -0.018em;
         }
         .brand-of {
           color: var(--mute);
@@ -781,7 +781,7 @@ function IndexEntry({
 function ColdStart({ onStart }: { onStart: () => void }) {
   return (
     <article className="cold fade-up">
-      <h1 className="serif">
+      <h1 className="display">
         An agent that answers <em>as WeiWei</em>.
       </h1>
       <p>
@@ -854,7 +854,7 @@ function Document({
 
   return (
     <article className="doc fade-up" key={card.question.id}>
-      <h1 className="serif">{question.question}</h1>
+      <h1 className="display">{question.question}</h1>
 
       {status === "error" ? (
         <section className="errsec">
