@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import type { BenchmarkQuestion, TraceEvent } from "@/lib/schemas"
 
 type Status = "idle" | "running" | "done" | "error" | "timeout"
@@ -37,7 +39,6 @@ function formatSeconds(ms?: number): string {
 const SOURCES = [
   "gmail_msgs",
   "calendar_events",
-  "slack_msgs",
   "notion_docs",
   "github_activity",
   "gdrive_files",
@@ -301,7 +302,7 @@ export default function Page() {
           disabled={running || cards.length === 0}
           aria-label="Run all questions sequentially"
         >
-          <span>{running ? "running" : "Run all"}</span>
+          <span>{running ? "Running" : "Run all"}</span>
           <span className="arrow">→</span>
         </button>
       </header>
@@ -333,7 +334,7 @@ export default function Page() {
                 />
                 {notConnected && connectUrl ? (
                   <a className="source-action source-action--connect" href={connectUrl} target="_blank" rel="noreferrer">
-                    connect {label}
+                    Connect {label}
                   </a>
                 ) : (
                   <button
@@ -362,11 +363,11 @@ export default function Page() {
           submitCustom()
         }}
       >
-        <span className="ask-label serif italic">Ask about WeiWei</span>
+        <span className="ask-label">Ask about WeiWei</span>
         <input
           className="ask-input"
           type="text"
-          placeholder="what do they think about X? what would they say if…?"
+          placeholder="What do they think about X? What would they say if…?"
           value={customQ}
           onChange={(e) => setCustomQ(e.target.value)}
           disabled={running}
@@ -374,11 +375,11 @@ export default function Page() {
         />
         <button
           type="submit"
-          className="ask-submit serif italic"
+          className="ask-submit"
           disabled={running || customQ.trim().length === 0}
           aria-label="Submit question"
         >
-          ask <span className="ask-arrow">→</span>
+          Ask <span className="ask-arrow">→</span>
         </button>
       </form>
 
@@ -401,9 +402,9 @@ export default function Page() {
           onKeyDown={onKeyDownIndex}
         >
           <div className="index-meta">
-            <span className="serif italic">
+            <span>
               {total === 0
-                ? "loading the benchmark…"
+                ? "Loading the benchmark…"
                 : allDone
                   ? `${correctCount} of ${total} matched.`
                   : doneCount === 0
@@ -584,9 +585,10 @@ export default function Page() {
         }
         .ask:focus-within { background-color: rgba(193, 88, 58, 0.025); }
         .ask-label {
-          color: var(--ink-3);
-          font-size: 13px;
-          letter-spacing: 0.01em;
+          color: var(--mute);
+          font-size: 11px;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
           flex-shrink: 0;
         }
         .ask-input {
@@ -595,19 +597,18 @@ export default function Page() {
           border: none;
           background: transparent;
           color: var(--ink);
-          font-size: 16px;
-          font-family: var(--font-serif);
+          font-size: 15px;
+          font-family: var(--font-sans);
           outline: none;
           padding: 4px 0;
         }
         .ask-input::placeholder {
           color: var(--mute);
-          font-style: italic;
         }
         .ask-input:disabled { opacity: 0.5; }
         .ask-submit {
           color: var(--accent);
-          font-size: 14px;
+          font-size: 13px;
           padding: 4px 0;
           border-bottom: 1px solid var(--accent);
           background: transparent;
@@ -619,7 +620,7 @@ export default function Page() {
         }
         .ask-submit:hover:not(:disabled) { color: #a1462e; border-color: #a1462e; }
         .ask-submit:disabled { color: var(--mute); border-color: var(--rule); cursor: not-allowed; }
-        .ask-arrow { font-size: 16px; line-height: 1; }
+        .ask-arrow { font-size: 14px; line-height: 1; }
         @media (max-width: 720px) {
           .sources { padding: 12px 18px; gap: 10px 14px; }
           .ask { padding: 14px 18px; gap: 10px; }
@@ -697,28 +698,30 @@ function IndexEntry({
   const num = pad2(index + 1)
 
   let trail: { text: string; tone: "match" | "differs" | "running" | "idle" | "error" } = {
-    text: "—",
+    text: "",
     tone: "idle",
   }
-  if (card.status === "running") trail = { text: "thinking…", tone: "running" }
+  if (card.status === "running") trail = { text: "Thinking…", tone: "running" }
   else if (card.status === "done") {
     if (isCustom) {
-      trail = { text: `answered · ${formatSeconds(card.total_ms)}`, tone: "match" }
+      trail = { text: `Answered · ${formatSeconds(card.total_ms)}`, tone: "match" }
     } else {
       trail = correct
-        ? { text: `matched · ${formatSeconds(card.total_ms)}`, tone: "match" }
-        : { text: `differs · ${formatSeconds(card.total_ms)}`, tone: "differs" }
+        ? { text: `Matched · ${formatSeconds(card.total_ms)}`, tone: "match" }
+        : { text: `Differs · ${formatSeconds(card.total_ms)}`, tone: "differs" }
     }
   } else if (card.status === "error" || card.status === "timeout")
-    trail = { text: card.status === "timeout" ? "timed out" : "error", tone: "error" }
+    trail = { text: card.status === "timeout" ? "Timed out" : "Error", tone: "error" }
 
   return (
     <li className={`entry ${selected ? "selected" : ""} ${card.status}`}>
       <button onClick={onClick} role="option" aria-selected={selected} className="entry-btn">
-        <span className={`num serif lnum ${selected ? "active" : ""}`}>{num}</span>
+        <span className={`num lnum ${selected ? "active" : ""}`}>{num}</span>
         <span className="text">
           <span className="q">{card.question.question}</span>
-          <span className={`trail serif italic tnum ${trail.tone}`}>— {trail.text}</span>
+          {trail.text && (
+            <span className={`trail tnum ${trail.tone}`}>{trail.text}</span>
+          )}
         </span>
       </button>
       <style jsx>{`
@@ -785,12 +788,12 @@ function ColdStart({ onStart }: { onStart: () => void }) {
         An agent that answers <em>as WeiWei</em>.
       </h1>
       <p>
-        Twenty questions, drawn from WeiWei&apos;s Gmail, Calendar, Slack, GitHub, Drive, Docs, Sheets, LinkedIn,
+        Twenty questions, drawn from WeiWei&apos;s Gmail, Calendar, GitHub, Drive, Docs, Sheets, LinkedIn,
         YouTube, Discord, and Instagram. The agent classifies each query, rewrites it, searches Atlas Vector,
         re-ranks, and synthesizes an answer in WeiWei&apos;s voice. Every step shows.
       </p>
       <p className="cold-ask">
-        Or just ask your own — the input is up top.
+        Or ask your own. The input is up top.
       </p>
       <button className="start" onClick={onStart}>
         Begin with the first question <span aria-hidden>→</span>
@@ -818,8 +821,7 @@ function ColdStart({ onStart }: { onStart: () => void }) {
         }
         .cold-ask {
           color: var(--mute);
-          font-size: 14px;
-          font-style: italic;
+          font-size: 13px;
           margin-top: -8px;
         }
         .start {
@@ -858,8 +860,8 @@ function Document({
 
       {status === "error" ? (
         <section className="errsec">
-          <p className="serif italic">The agent couldn&apos;t complete this question.</p>
-          <p className="errmsg">{error_message ?? "unknown error"}</p>
+          <p className="errtitle">The agent couldn&apos;t complete this question.</p>
+          <p className="errmsg">{error_message ?? "Unknown error"}</p>
           <button className="retry" onClick={onRetry}>Try again <span aria-hidden>→</span></button>
         </section>
       ) : (
@@ -874,28 +876,32 @@ function Document({
         <section className="verdict">
           {status === "done" ? (
             isCustom ? (
-              <span className="verdict-rule serif italic match">
-                — answered{total_ms ? ` · ${formatSeconds(total_ms)}` : ""} —
+              <span className="verdict-rule match">
+                Answered{total_ms ? ` · ${formatSeconds(total_ms)}` : ""}
               </span>
             ) : (
-              <span className={`verdict-rule serif italic ${correct ? "match" : "differs"}`}>
-                — {correct ? "matched" : "differs"}{total_ms ? ` · ${formatSeconds(total_ms)}` : ""} —
+              <span className={`verdict-rule ${correct ? "match" : "differs"}`}>
+                {correct ? "Matched" : "Differs"}{total_ms ? ` · ${formatSeconds(total_ms)}` : ""}
               </span>
             )
           ) : status === "running" ? (
-            <span className="verdict-rule serif italic running">— still working —</span>
+            <span className="verdict-rule running">Still working</span>
           ) : null}
         </section>
       )}
 
       {status !== "error" && (
         <section className="answer">
-          <p className="agent serif">
-            {answer || (status === "running" ? <span className="placeholder italic">composing…</span> : "—")}
-          </p>
+          <div className="agent serif">
+            {answer ? (
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{answer}</ReactMarkdown>
+            ) : status === "running" ? (
+              <span className="placeholder">Composing…</span>
+            ) : null}
+          </div>
           {status === "done" && !isCustom && !correct && (
             <p className="truth">
-              <span className="serif italic prefix">You remembered: </span>
+              <span className="prefix">You remembered</span>
               <span className="serif">{question.ground_truth}</span>
             </p>
           )}
@@ -922,8 +928,10 @@ function Document({
           padding: 4px 0;
         }
         .verdict-rule {
-          font-size: 13px;
-          letter-spacing: 0.04em;
+          font-family: var(--font-sans);
+          font-size: 11px;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
         }
         .verdict-rule.match { color: var(--match); }
         .verdict-rule.differs { color: var(--differs); }
@@ -939,22 +947,88 @@ function Document({
           color: var(--ink);
           letter-spacing: -0.005em;
         }
-        .placeholder { color: var(--mute); font-size: 17px; }
+        .agent :global(p) { margin: 0 0 0.75em; }
+        .agent :global(p:last-child) { margin-bottom: 0; }
+        .agent :global(strong) { font-weight: 600; }
+        .agent :global(em) { font-style: italic; }
+        .agent :global(a) {
+          color: var(--ink);
+          text-decoration: underline;
+          text-decoration-thickness: 1px;
+          text-underline-offset: 3px;
+        }
+        .agent :global(ul),
+        .agent :global(ol) {
+          margin: 0.5em 0 0.75em;
+          padding-left: 1.4em;
+        }
+        .agent :global(li) { margin: 0.2em 0; }
+        .agent :global(code) {
+          font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+          font-size: 0.85em;
+          background: var(--rule-soft, rgba(0,0,0,0.05));
+          padding: 0.05em 0.35em;
+          border-radius: 3px;
+        }
+        .agent :global(pre) {
+          font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+          font-size: 14px;
+          line-height: 1.5;
+          background: var(--rule-soft, rgba(0,0,0,0.05));
+          padding: 12px 14px;
+          border-radius: 4px;
+          overflow-x: auto;
+          margin: 0.5em 0 0.75em;
+        }
+        .agent :global(pre code) {
+          background: none;
+          padding: 0;
+          font-size: inherit;
+        }
+        .agent :global(blockquote) {
+          margin: 0.5em 0 0.75em;
+          padding-left: 14px;
+          border-left: 2px solid var(--rule-soft, rgba(0,0,0,0.15));
+          color: var(--ink-3, inherit);
+        }
+        .agent :global(hr) {
+          border: 0;
+          border-top: 1px solid var(--rule-soft, rgba(0,0,0,0.1));
+          margin: 1em 0;
+        }
+        .placeholder {
+          color: var(--mute);
+          font-size: 17px;
+          font-family: var(--font-sans);
+        }
         .truth {
           font-size: 17px;
           line-height: 1.55;
           color: var(--ink-3);
           padding-top: 14px;
           border-top: 1px solid var(--rule-soft);
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
         }
-        .truth .prefix { color: var(--mute); font-size: 14px; margin-right: 4px; }
+        .truth .prefix {
+          color: var(--mute);
+          font-family: var(--font-sans);
+          font-size: 10px;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+        }
         .errsec {
           display: flex;
           flex-direction: column;
           gap: 10px;
           padding: 12px 0;
         }
-        .errsec p { font-size: 17px; color: var(--differs); }
+        .errtitle {
+          font-family: var(--font-serif);
+          font-size: 17px;
+          color: var(--differs);
+        }
         .errmsg { color: var(--mute); font-size: 13px; word-break: break-word; }
         .retry {
           align-self: flex-start;
@@ -981,7 +1055,6 @@ function Document({
 const SOURCE_LABEL: Record<string, string> = {
   gmail_msgs: "Gmail",
   calendar_events: "Calendar",
-  slack_msgs: "Slack",
   notion_docs: "Notion",
   github_activity: "GitHub",
   gdrive_files: "Drive",
@@ -1004,7 +1077,6 @@ const MODE_LABEL: Record<string, string> = {
 const SOURCE_COLOR: Record<string, string> = {
   gmail_msgs: "#c97e3a",
   calendar_events: "#5d7d5e",
-  slack_msgs: "#7e5a8a",
   notion_docs: "#a08856",
   github_activity: "#5b5b5b",
   gdrive_files: "#3b6fb6",
@@ -1252,7 +1324,7 @@ function VectorField({
   if (!layout && !layoutErr) {
     return (
       <figure className="vfield">
-        <div className="vfield-empty serif italic">building the index map…</div>
+        <div className="vfield-empty">Building the index map…</div>
         <style jsx>{`
           .vfield { margin: 0; padding: 8px 0; }
           .vfield-empty {
@@ -1271,8 +1343,8 @@ function VectorField({
   if (layoutErr) {
     return (
       <figure className="vfield">
-        <div className="vfield-empty serif italic">
-          couldn&apos;t load the index map — {layoutErr}
+        <div className="vfield-empty">
+          Couldn&apos;t load the index map. {layoutErr}
         </div>
         <style jsx>{`
           .vfield { margin: 0; padding: 8px 0; }
@@ -1564,35 +1636,39 @@ function ClassifyChip({ events }: { events: TraceEvent[] }) {
   const label = CATEGORY_LABEL[classify.strategy] ?? classify.strategy
   return (
     <div className="classify fade-up">
-      <span className="classify-key serif italic">classified as</span>
+      <span className="classify-key">Classified as</span>
       <span className="classify-val">{label}</span>
       {classify.reasoning && (
-        <span className="classify-why serif italic">— {classify.reasoning}</span>
+        <span className="classify-why">{classify.reasoning}</span>
       )}
       <style jsx>{`
         .classify {
           display: flex;
           align-items: baseline;
-          gap: 8px;
-          font-size: 12px;
+          gap: 10px;
+          font-family: var(--font-sans);
           color: var(--ink-3);
           padding: 4px 0 0;
           flex-wrap: wrap;
         }
-        .classify-key { color: var(--mute); font-size: 12px; }
+        .classify-key {
+          color: var(--mute);
+          font-size: 10px;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+        }
         .classify-val {
           color: var(--accent);
-          font-family: var(--font-serif);
-          font-style: italic;
-          font-weight: 500;
           font-size: 13px;
-          letter-spacing: 0.005em;
+          font-weight: 500;
+          letter-spacing: -0.005em;
         }
         .classify-why {
           color: var(--ink-3);
           font-size: 12px;
           flex: 1;
           min-width: 0;
+          line-height: 1.4;
         }
       `}</style>
     </div>
@@ -1661,12 +1737,11 @@ function CandidateBars({ events }: { events: TraceEvent[] }) {
 
   return (
     <section className="cands fade-up">
-      <div className="cands-head serif italic">
-        — top candidates · <span className="cands-tool">{latest.tool}</span>
-        {" · "}
-        <span className="cands-meta">{scoreLabel}</span>
-        {" "}
-        <span className="cands-count">({cands.length})</span>
+      <div className="cands-head">
+        <span className="cands-label">Top candidates</span>
+        <span className="cands-meta">
+          {latest.tool} · {scoreLabel} · {cands.length}
+        </span>
       </div>
       <ul className="cand-list">
         {cands.map((c, i) => {
@@ -1696,28 +1771,23 @@ function CandidateBars({ events }: { events: TraceEvent[] }) {
           margin-top: -8px;
         }
         .cands-head {
+          display: flex;
+          align-items: baseline;
+          gap: 12px;
           font-family: var(--font-sans);
-          font-size: 11px;
-          color: var(--mute);
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          margin-bottom: 10px;
-          font-style: normal;
+          margin-bottom: 12px;
+          flex-wrap: wrap;
         }
-        .cands-tool {
-          color: var(--ink-2);
-          font-style: normal;
-          font-family: var(--font-sans);
+        .cands-label {
+          color: var(--mute);
+          font-size: 10px;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
         }
         .cands-meta {
           color: var(--ink-3);
-          font-family: var(--font-sans);
           font-size: 11px;
-          letter-spacing: 0.04em;
-        }
-        .cands-count {
-          color: var(--mute);
-          font-style: normal;
+          letter-spacing: 0.005em;
         }
         .cand-list {
           list-style: none;
